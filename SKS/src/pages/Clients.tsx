@@ -3,6 +3,7 @@ import { AppData, Client, Notification } from '../types';
 import { Plus, Search, User, Car, Phone, Mail, Edit2, Trash2, X, Save } from 'lucide-react';
 import { generateId } from '../store';
 import { format } from 'date-fns';
+import { loadDbExtras } from './Database';
 
 interface ClientsProps {
   data: AppData;
@@ -24,6 +25,7 @@ const emptyClient: Omit<Client, 'id' | 'createdAt'> = {
 };
 
 export default function Clients({ data, updateData, addNotification }: ClientsProps) {
+  const db = loadDbExtras();
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
@@ -234,23 +236,30 @@ export default function Clients({ data, updateData, addNotification }: ClientsPr
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-neutral-700 mb-1">Марка</label>
-                    <input
-                      type="text"
+                    <select
                       value={formData.car.make}
-                      onChange={(e) => setFormData({ ...formData, car: { ...formData.car, make: e.target.value } })}
+                      onChange={(e) => setFormData({ ...formData, car: { ...formData.car, make: e.target.value, model: '' } })}
                       className="w-full p-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#ffcc00]"
-                      placeholder="Toyota"
-                    />
+                    >
+                      <option value="">Оберіть марку...</option>
+                      {db.vehicleMakes.map(vm => (
+                        <option key={vm.id} value={vm.make}>{vm.make}</option>
+                      ))}
+                    </select>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-neutral-700 mb-1">Модель</label>
-                    <input
-                      type="text"
+                    <select
                       value={formData.car.model}
                       onChange={(e) => setFormData({ ...formData, car: { ...formData.car, model: e.target.value } })}
                       className="w-full p-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#ffcc00]"
-                      placeholder="Camry"
-                    />
+                      disabled={!formData.car.make}
+                    >
+                      <option value="">Оберіть модель...</option>
+                      {(db.vehicleMakes.find(vm => vm.make === formData.car.make)?.models || []).map(m => (
+                        <option key={m.id} value={m.name}>{m.name}</option>
+                      ))}
+                    </select>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-neutral-700 mb-1">Рік</label>

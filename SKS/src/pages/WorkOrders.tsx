@@ -644,7 +644,7 @@ export default function WorkOrders({ data, updateData, addNotification, openDiag
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="text-sm font-bold text-neutral-600">Запчастини зі складу</label>
-              <span className="text-xs text-neutral-400">ціна підтягується автоматично</span>
+              <span className="text-xs text-neutral-400">ціна підтягується автоматично, але може бути змінена</span>
             </div>
             <div className="space-y-2">
               {orderForm.parts.map((part, idx) => (
@@ -661,9 +661,15 @@ export default function WorkOrders({ data, updateData, addNotification, openDiag
                       </option>
                     ))}
                   </select>
-                  <span className="text-sm font-bold text-neutral-600 w-24 text-center">
-                    {part.price > 0 ? `${part.price} ₴` : '—'}
-                  </span>
+                  <input
+                    type="number"
+                    min={0}
+                    value={part.price || ''}
+                    onChange={e => updatePart(idx, 'price', Number(e.target.value))}
+                    className="w-24 p-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#ffcc00] text-sm"
+                    placeholder="Ціна ₴"
+                    title="Ціна за одиницю"
+                  />
                   <input
                     type="number"
                     min={1}
