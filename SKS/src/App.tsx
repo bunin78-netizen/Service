@@ -161,6 +161,8 @@ export function App() {
     }
   };
 
+  const isAdmin = currentUser?.role === 'admin';
+
   // ── Navigation ──────────────────────────────────────────────────────────────
   const navGroups = [
     {
@@ -185,8 +187,8 @@ export function App() {
       label: 'Фінанси',
       items: [
         { id: 'expenses', label: 'Витрати', icon: Wallet },
-        { id: 'salary', label: 'Зарплата', icon: Calculator },
-        { id: 'reports', label: 'Звіти', icon: TrendingUp },
+        ...(isAdmin ? [{ id: 'salary', label: 'Зарплата', icon: Calculator }] : []),
+        ...(isAdmin ? [{ id: 'reports', label: 'Звіти', icon: TrendingUp }] : []),
         { id: 'rro', label: 'РРО / ПРРО', icon: Receipt },
       ],
     },
@@ -194,13 +196,21 @@ export function App() {
       label: 'Система',
       items: [
         { id: 'telegram', label: 'Telegram Бот', icon: Bot },
-        { id: 'users', label: 'Користувачі', icon: UserCog },
-        { id: 'settings', label: 'Налаштування', icon: Settings },
+        ...(isAdmin ? [{ id: 'users', label: 'Користувачі', icon: UserCog }] : []),
+        ...(isAdmin ? [{ id: 'settings', label: 'Налаштування', icon: Settings }] : []),
       ],
     },
   ];
 
   const allNavItems = navGroups.flatMap(g => g.items);
+
+  const accessDenied = (
+    <div className="flex flex-col items-center justify-center h-full text-neutral-400 py-20">
+      <Settings size={48} className="mb-4 opacity-30" />
+      <p className="text-lg font-bold">Доступ заборонено</p>
+      <p className="text-sm mt-1">Цей розділ доступний лише адміністратору</p>
+    </div>
+  );
 
   const renderContent = () => {
     switch (activeTab) {
@@ -211,13 +221,13 @@ export function App() {
       case 'workorders': return <WorkOrders data={data} updateData={updateData} addNotification={addNotification} />;
       case 'diagnosis': return <WorkOrders data={data} updateData={updateData} addNotification={addNotification} openDiagnosisByDefault />;
       case 'suppliershop': return <SupplierShop data={data} updateData={updateData} />;
-      case 'salary': return <Salary data={data} />;
-      case 'reports': return <Reports data={data} />;
+      case 'salary': return isAdmin ? <Salary data={data} /> : accessDenied;
+      case 'reports': return isAdmin ? <Reports data={data} /> : accessDenied;
       case 'expenses': return <Expenses data={data} updateData={updateData} />;
       case 'rro': return <RROPage data={data} updateData={updateData} />;
       case 'telegram': return <TelegramPage data={data} onSave={(d) => setData(d)} />;
-      case 'users': return <UsersPage data={data} updateData={updateData} />;
-      case 'settings': return <SettingsPage data={data} updateData={updateData} />;
+      case 'users': return isAdmin ? <UsersPage data={data} updateData={updateData} /> : accessDenied;
+      case 'settings': return isAdmin ? <SettingsPage data={data} updateData={updateData} /> : accessDenied;
       case 'database': return <DatabasePage data={data} updateData={updateData} />;
       default: return <Dashboard data={data} setActiveTab={setActiveTab} />;
     }
@@ -482,6 +492,7 @@ export function App() {
 
                     <div className="border-t my-1" />
 
+                    {isAdmin && (
                     <button
                       onClick={() => { setActiveTab('settings'); setShowUserMenu(false); }}
                       className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-neutral-100 transition-colors text-sm text-neutral-700 font-medium"
@@ -489,7 +500,9 @@ export function App() {
                       <Settings size={15} className="text-neutral-400" />
                       Налаштування системи
                     </button>
+                    )}
 
+                    {isAdmin && (
                     <button
                       onClick={() => { setActiveTab('users'); setShowUserMenu(false); }}
                       className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-neutral-100 transition-colors text-sm text-neutral-700 font-medium"
@@ -497,6 +510,7 @@ export function App() {
                       <UserCog size={15} className="text-neutral-400" />
                       Керування користувачами
                     </button>
+                    )}
 
                     <div className="border-t my-1" />
 

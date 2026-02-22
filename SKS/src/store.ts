@@ -67,7 +67,7 @@ const INITIAL_DATA: AppData = {
         canDeleteOrders: false,
         canManageClients: true,
         canManageInventory: true,
-        canViewReports: true,
+        canViewReports: false,
         canManageUsers: false,
         canManageSettings: false,
       }

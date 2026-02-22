@@ -7,6 +7,7 @@ type SortField = 'name' | 'sku' | 'category' | 'stock' | 'purchasePrice' | 'sale
 type SortDir = 'asc' | 'desc';
 
 export default function Inventory({ data, updateData }: { data: AppData, updateData: (d: Partial<AppData>) => void }) {
+  const currentUser = data.users.find(u => u.id === data.currentUserId);
   const [searchTerm, setSearchTerm] = useState('');
   const [filter, setFilter] = useState<'all' | 'low'>('all');
   const [categoryFilter, setCategoryFilter] = useState('');
@@ -319,12 +320,14 @@ export default function Inventory({ data, updateData }: { data: AppData, updateD
                       >
                         <Edit2 size={16} />
                       </button>
+                      {currentUser?.permissions.canDeleteOrders && (
                       <button 
                         onClick={() => handleDeletePart(item.id)}
                         className="p-2 text-neutral-400 hover:text-red-600 rounded-lg hover:bg-red-50"
                       >
                         <Trash2 size={16} />
                       </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -404,12 +407,14 @@ export default function Inventory({ data, updateData }: { data: AppData, updateD
               {data.categories?.map(c => (
                 <div key={c.id} className="p-2 bg-neutral-50 rounded flex justify-between items-center group">
                   <span className="text-sm">{c.name}</span>
+                  {currentUser?.permissions.canDeleteOrders && (
                   <button 
                     onClick={() => handleDeleteCategory(c.id)}
                     className="text-red-400 opacity-0 group-hover:opacity-100"
                   >
                     <Trash2 size={14}/>
                   </button>
+                  )}
                 </div>
               ))}
             </div>
@@ -476,12 +481,14 @@ export default function Inventory({ data, updateData }: { data: AppData, updateD
                     >
                       <Edit2 size={14}/>
                     </button>
+                    {currentUser?.permissions.canDeleteOrders && (
                     <button 
                       onClick={() => handleDeleteSupplier(s.id)}
                       className="text-red-400 p-1"
                     >
                       <Trash2 size={14}/>
                     </button>
+                    )}
                   </div>
                 </div>
               ))}

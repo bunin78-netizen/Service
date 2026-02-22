@@ -972,12 +972,14 @@ export default function WorkOrders({ data, updateData, addNotification, openDiag
                       )}
 
                       {/* Delete */}
+                      {currentUser?.permissions.canDeleteOrders && (
                       <button
                         onClick={() => handleDeleteOrder(order.id)}
                         className="px-3 py-1.5 rounded-lg text-xs font-bold bg-red-50 text-red-500 flex items-center gap-1 hover:bg-red-100"
                       >
                         <Trash2 size={12} /> Видалити
                       </button>
+                      )}
                     </div>
 
                     {/* Print */}
