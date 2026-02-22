@@ -537,10 +537,11 @@ export default function WorkOrders({ data, updateData, addNotification, openDiag
                 <button
                   type="button"
                   onClick={() => setShowAddClientModal(true)}
-                  className="bg-[#ffcc00] text-black px-3 py-2 rounded-lg font-bold flex items-center gap-1 hover:bg-[#e6b800] transition-colors shrink-0 text-sm"
+                  className="bg-[#ffcc00] text-black p-2 rounded-lg font-bold flex items-center justify-center hover:bg-[#e6b800] transition-colors shrink-0"
                   title="Додати клієнта"
+                  aria-label="Додати клієнта"
                 >
-                  <Plus size={15} /> Додати клієнта
+                  <Plus size={18} />
                 </button>
               </div>
             </div>
