@@ -211,6 +211,17 @@ const INITIAL_DATA: AppData = {
     notifyPaymentReceived: true,
     notifyNewClient: true,
     welcomeMessage: 'Вітаємо в SmartKharkov! 🚗 Ми допоможемо вам з ремонтом та обслуговуванням вашого авто.',
+  },
+  viberSettings: {
+    enabled: false,
+    authToken: '',
+    notifyNewOrder: true,
+    notifyOrderCompleted: true,
+    notifyLowStock: true,
+    notifyPaymentReceived: true,
+    notifyNewClient: true,
+    sendFiscalReceipts: true,
+    welcomeMessage: 'Вітаємо в SmartKharkov! 🚗 Ми допоможемо вам з ремонтом та обслуговуванням вашого авто.',
   }
 };
 

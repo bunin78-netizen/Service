@@ -144,6 +144,18 @@ export type TelegramSettings = {
   welcomeMessage: string;
 };
 
+export type ViberSettings = {
+  enabled: boolean;
+  authToken: string;
+  notifyNewOrder: boolean;
+  notifyOrderCompleted: boolean;
+  notifyLowStock: boolean;
+  notifyPaymentReceived: boolean;
+  notifyNewClient: boolean;
+  sendFiscalReceipts: boolean;
+  welcomeMessage: string;
+};
+
 export type WarehouseDocumentItem = {
   partId: string;
   quantity: number;
@@ -183,5 +195,6 @@ export type AppData = {
     rroApiKey: string;
   };
   telegramSettings: TelegramSettings;
+  viberSettings: ViberSettings;
   warehouseDocuments: WarehouseDocument[];
 };

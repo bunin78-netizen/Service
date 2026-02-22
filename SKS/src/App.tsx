@@ -20,6 +20,7 @@ import {
   ShoppingBag,
   Receipt,
   ChevronDown,
+  MessageCircle,
 } from 'lucide-react';
 import { loadData, saveData } from './store';
 import { AppData, Notification } from './types';
@@ -33,12 +34,14 @@ import Expenses from './pages/Expenses';
 import SettingsPage from './pages/Settings';
 import UsersPage from './pages/Users';
 import TelegramPage from './pages/Telegram';
+import ViberPage from './pages/Viber';
 import DatabasePage from './pages/Database';
 import SupplierShop from './pages/SupplierShop';
 import RROPage from './pages/RRO';
 import Login from './pages/Login';
 import WarehouseDocuments from './pages/WarehouseDocuments';
 import { sendTelegramNotification } from './pages/Telegram';
+import { sendViberNotification } from './pages/Viber';
 
 const MOBILE_BREAKPOINT = 768;
 
@@ -159,6 +162,20 @@ export function App() {
         notification.message
       );
     }
+
+    // Send Viber notification if enabled
+    if (data.viberSettings?.enabled) {
+      const viberType = notification.type === 'order' ? 'order'
+        : notification.type === 'payment' ? 'payment'
+        : notification.type === 'stock' ? 'stock'
+        : 'order';
+      sendViberNotification(
+        data.viberSettings,
+        viberType,
+        notification.title,
+        notification.message
+      );
+    }
   };
 
   const isAdmin = currentUser?.role === 'admin';
@@ -196,6 +213,7 @@ export function App() {
       label: 'Система',
       items: [
         { id: 'telegram', label: 'Telegram Бот', icon: Bot },
+        { id: 'viber', label: 'Viber Бот', icon: MessageCircle },
         ...(isAdmin ? [{ id: 'users', label: 'Користувачі', icon: UserCog }] : []),
         ...(isAdmin ? [{ id: 'settings', label: 'Налаштування', icon: Settings }] : []),
       ],
@@ -226,6 +244,7 @@ export function App() {
       case 'expenses': return <Expenses data={data} updateData={updateData} />;
       case 'rro': return <RROPage data={data} updateData={updateData} />;
       case 'telegram': return <TelegramPage data={data} onSave={(d) => setData(d)} />;
+      case 'viber': return <ViberPage data={data} onSave={(d) => setData(d)} />;
       case 'users': return isAdmin ? <UsersPage data={data} updateData={updateData} /> : accessDenied;
       case 'settings': return isAdmin ? <SettingsPage data={data} updateData={updateData} /> : accessDenied;
       case 'database': return <DatabasePage data={data} updateData={updateData} />;
