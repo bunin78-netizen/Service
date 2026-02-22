@@ -3,6 +3,22 @@ import { AppData, WarehouseDocument, WarehouseDocumentItem } from '../types';
 import { Plus, FileText, X, Save, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
 import { generateId } from '../store';
 
+function applyDocumentToInventory(
+  docType: WarehouseDocument['type'],
+  items: WarehouseDocumentItem[],
+  inventory: AppData['inventory'],
+  multiplier: 1 | -1,
+): AppData['inventory'] {
+  const itemMap = new Map(items.map(i => [i.partId, i]));
+  return inventory.map(part => {
+    const item = itemMap.get(part.id);
+    if (!item) return part;
+    const delta = item.quantity * multiplier;
+    const stockChange = docType === 'incoming' ? delta : -delta;
+    return { ...part, stock: Math.max(0, part.stock + stockChange) };
+  });
+}
+
 const DOC_TYPE_LABELS: Record<WarehouseDocument['type'], string> = {
   incoming: 'Прихід',
   outgoing: 'Видаток',
@@ -60,20 +76,31 @@ export default function WarehouseDocuments({
   const handleSave = () => {
     if (!form.number.trim() || !form.date) return;
     if (editingDoc) {
+      // Reverse old document effect, then apply new document effect
+      let newInventory = applyDocumentToInventory(editingDoc.type, editingDoc.items, data.inventory, -1);
+      newInventory = applyDocumentToInventory(form.type, form.items, newInventory, 1);
       const updated = docs.map(d =>
         d.id === editingDoc.id ? { ...d, ...form } : d
       );
-      updateData({ warehouseDocuments: updated });
+      updateData({ warehouseDocuments: updated, inventory: newInventory });
     } else {
+      const newInventory = applyDocumentToInventory(form.type, form.items, data.inventory, 1);
       const newDoc: WarehouseDocument = { id: generateId(), ...form };
-      updateData({ warehouseDocuments: [newDoc, ...docs] });
+      updateData({ warehouseDocuments: [newDoc, ...docs], inventory: newInventory });
     }
     setShowModal(false);
   };
 
   const handleDelete = (id: string) => {
     if (!confirm('Видалити документ?')) return;
-    updateData({ warehouseDocuments: docs.filter(d => d.id !== id) });
+    const doc = docs.find(d => d.id === id);
+    const newDocs = docs.filter(d => d.id !== id);
+    if (doc) {
+      const newInventory = applyDocumentToInventory(doc.type, doc.items, data.inventory, -1);
+      updateData({ warehouseDocuments: newDocs, inventory: newInventory });
+    } else {
+      updateData({ warehouseDocuments: newDocs });
+    }
   };
 
   const addItem = () => {

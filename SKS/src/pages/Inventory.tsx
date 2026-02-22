@@ -96,7 +96,7 @@ export default function Inventory({ data, updateData }: { data: AppData, updateD
 
     if (editingPart) {
       const updated = data.inventory.map(p => 
-        p.id === editingPart.id ? { ...p, ...partForm } as Part : p
+        p.id === editingPart.id ? { ...p, ...partForm, stock: p.stock } as Part : p
       );
       updateData({ inventory: updated });
     } else {
@@ -107,7 +107,7 @@ export default function Inventory({ data, updateData }: { data: AppData, updateD
         category: partForm.category || '',
         purchasePrice: partForm.purchasePrice || 0,
         salePrice: partForm.salePrice || 0,
-        stock: partForm.stock || 0,
+        stock: 0,
         minStock: partForm.minStock || 0,
         supplierId: partForm.supplierId || '',
         location: partForm.location,
@@ -454,13 +454,10 @@ export default function Inventory({ data, updateData }: { data: AppData, updateD
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-neutral-700 mb-1">Кількість</label>
-                  <input
-                    type="number"
-                    value={partForm.stock || ''}
-                    onChange={(e) => setPartForm({ ...partForm, stock: Number(e.target.value) })}
-                    className="w-full p-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#ffcc00]"
-                  />
+                  <label className="block text-sm font-medium text-neutral-700 mb-1">Поточний залишок</label>
+                  <div className="w-full p-2 border rounded-lg bg-neutral-50 text-neutral-500 text-sm">
+                    {editingPart ? `${editingPart.stock} шт` : '0 шт — керується через складські документи'}
+                  </div>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-neutral-700 mb-1">Мін. залишок</label>
