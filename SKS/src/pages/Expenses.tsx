@@ -5,6 +5,7 @@ import { format } from 'date-fns';
 import { generateId } from '../store';
 
 export default function Expenses({ data, updateData }: { data: AppData, updateData: (d: Partial<AppData>) => void }) {
+  const currentUser = data.users.find(u => u.id === data.currentUserId);
   const [showModal, setShowModal] = useState(false);
   const [formData, setFormData] = useState({
     category: '',
@@ -97,12 +98,14 @@ export default function Expenses({ data, updateData }: { data: AppData, updateDa
                   <td className="px-6 py-4 font-medium text-neutral-800">{expense.description}</td>
                   <td className="px-6 py-4 text-right font-bold text-red-600">-{expense.amount.toLocaleString()} ₴</td>
                   <td className="px-6 py-4 text-right">
+                    {currentUser?.permissions.canDeleteOrders && (
                     <button 
                       onClick={() => handleDelete(expense.id)}
                       className="text-neutral-400 hover:text-red-500 p-2"
                     >
                       <Trash2 size={16} />
                     </button>
+                    )}
                   </td>
                 </tr>
               ))}

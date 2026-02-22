@@ -88,6 +88,7 @@ export default function WarehouseDocuments({
   data: AppData;
   updateData: (d: Partial<AppData>) => void;
 }) {
+  const currentUser = data.users.find(u => u.id === data.currentUserId);
   const [showModal, setShowModal] = useState(false);
   const [editingDoc, setEditingDoc] = useState<WarehouseDocument | null>(null);
   const [form, setForm] = useState<Omit<WarehouseDocument, 'id'>>(EMPTY_FORM);
@@ -363,12 +364,14 @@ export default function WarehouseDocuments({
                     >
                       <FileText size={15} />
                     </button>
+                    {currentUser?.permissions.canDeleteOrders && (
                     <button
                       onClick={() => handleDelete(doc.id)}
                       className="p-1.5 text-neutral-400 hover:text-red-600 rounded-lg hover:bg-red-50"
                     >
                       <Trash2 size={15} />
                     </button>
+                    )}
                   </div>
                   {expandedId === doc.id ? (
                     <ChevronUp size={16} className="text-neutral-400" />

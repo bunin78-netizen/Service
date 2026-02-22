@@ -26,6 +26,7 @@ const emptyClient: Omit<Client, 'id' | 'createdAt'> = {
 
 export default function Clients({ data, updateData, addNotification }: ClientsProps) {
   const db = loadDbExtras();
+  const currentUser = data.users.find(u => u.id === data.currentUserId);
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
@@ -137,12 +138,14 @@ export default function Clients({ data, updateData, addNotification }: ClientsPr
                 >
                   <Edit2 size={16} />
                 </button>
+                {currentUser?.permissions.canDeleteOrders && (
                 <button 
                   onClick={() => handleDelete(client.id)}
                   className="p-2 text-neutral-400 hover:text-red-600 rounded-lg hover:bg-red-50"
                 >
                   <Trash2 size={16} />
                 </button>
+                )}
               </div>
             </div>
 
