@@ -1,11 +1,19 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { AppData, Supplier, Part } from '../types';
-import { Plus, Search, Package, AlertTriangle, Edit2, Trash2, X, Save } from 'lucide-react';
+import { Plus, Search, Package, AlertTriangle, Edit2, Trash2, X, Save, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { generateId } from '../store';
+
+type SortField = 'name' | 'sku' | 'category' | 'stock' | 'purchasePrice' | 'salePrice';
+type SortDir = 'asc' | 'desc';
 
 export default function Inventory({ data, updateData }: { data: AppData, updateData: (d: Partial<AppData>) => void }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [filter, setFilter] = useState<'all' | 'low'>('all');
+  const [categoryFilter, setCategoryFilter] = useState('');
+  const [sortField, setSortField] = useState<SortField>('name');
+  const [sortDir, setSortDir] = useState<SortDir>('asc');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(20);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [showSupplierModal, setShowSupplierModal] = useState(false);
   const [showPartModal, setShowPartModal] = useState(false);
@@ -122,14 +130,58 @@ export default function Inventory({ data, updateData }: { data: AppData, updateD
     updateData({ inventory: data.inventory.filter(p => p.id !== id) });
   };
 
-  const filteredItems = data.inventory.filter(p => {
-    const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) || p.sku.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesFilter = filter === 'all' || p.stock <= p.minStock;
-    return matchesSearch && matchesFilter;
-  });
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDir('asc');
+    }
+    setCurrentPage(1);
+  };
+
+  const resetPage = () => setCurrentPage(1);
+
+  const filteredItems = data.inventory
+    .filter(p => {
+      const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) || p.sku.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesFilter = filter === 'all' || p.stock <= p.minStock;
+      const matchesCategory = !categoryFilter || p.category === categoryFilter;
+      return matchesSearch && matchesFilter && matchesCategory;
+    })
+    .sort((a, b) => {
+      let aValue: string | number = a[sortField] ?? '';
+      let bValue: string | number = b[sortField] ?? '';
+      if (typeof aValue === 'string') aValue = aValue.toLowerCase();
+      if (typeof bValue === 'string') bValue = bValue.toLowerCase();
+      if (aValue < bValue) return sortDir === 'asc' ? -1 : 1;
+      if (aValue > bValue) return sortDir === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+  const totalPages = Math.max(1, Math.ceil(filteredItems.length / itemsPerPage));
+  const safePage = Math.min(currentPage, totalPages);
+  const pagedItems = filteredItems.slice((safePage - 1) * itemsPerPage, safePage * itemsPerPage);
+
+  const SortIcon = ({ field }: { field: SortField }) => {
+    if (sortField !== field) return <ArrowUpDown size={13} className="inline ml-1 opacity-40" />;
+    return sortDir === 'asc'
+      ? <ArrowUp size={13} className="inline ml-1 text-[#e6b800]" />
+      : <ArrowDown size={13} className="inline ml-1 text-[#e6b800]" />;
+  };
 
   const totalValue = data.inventory.reduce((acc, curr) => acc + (curr.purchasePrice * curr.stock), 0);
   const potentialValue = data.inventory.reduce((acc, curr) => acc + (curr.salePrice * curr.stock), 0);
+
+  const pageButtons = useMemo(() =>
+    Array.from({ length: totalPages }, (_, i) => i + 1)
+      .filter(p => p === 1 || p === totalPages || Math.abs(p - safePage) <= 2)
+      .reduce<(number | '...')[]>((acc, p, idx, arr) => {
+        if (idx > 0 && p - (arr[idx - 1] as number) > 1) acc.push('...');
+        acc.push(p);
+        return acc;
+      }, []),
+  [totalPages, safePage]);
 
   return (
     <div className="space-y-6">
@@ -152,29 +204,39 @@ export default function Inventory({ data, updateData }: { data: AppData, updateD
         <div className="p-4 border-b flex flex-wrap gap-4 items-center justify-between bg-neutral-50/50">
           <div className="flex gap-2">
             <button 
-              onClick={() => setFilter('all')}
+              onClick={() => { setFilter('all'); resetPage(); }}
               className={`px-4 py-2 rounded-xl text-sm font-bold transition-colors ${filter === 'all' ? 'bg-neutral-900 text-white' : 'bg-white border hover:bg-neutral-100'}`}
             >
               Всі запчастини
             </button>
             <button 
-              onClick={() => setFilter('low')}
+              onClick={() => { setFilter('low'); resetPage(); }}
               className={`px-4 py-2 rounded-xl text-sm font-bold transition-colors ${filter === 'low' ? 'bg-red-500 text-white' : 'bg-white border text-red-500 hover:bg-red-50'}`}
             >
               Критичний залишок
             </button>
           </div>
-          <div className="flex gap-4 items-center">
+          <div className="flex gap-4 items-center flex-wrap">
             <div className="relative">
               <Search className="absolute left-3 top-2.5 text-neutral-400" size={18} />
               <input 
                 type="text" 
                 placeholder="Пошук артикула..."
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => { setSearchTerm(e.target.value); resetPage(); }}
                 className="pl-10 pr-4 py-2 border rounded-xl focus:ring-2 focus:ring-[#ffcc00] outline-none text-sm w-64"
               />
             </div>
+            <select
+              value={categoryFilter}
+              onChange={(e) => { setCategoryFilter(e.target.value); resetPage(); }}
+              className="border rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#ffcc00]"
+            >
+              <option value="">Всі категорії</option>
+              {data.categories?.map(c => (
+                <option key={c.id} value={c.name}>{c.name}</option>
+              ))}
+            </select>
             <button 
               onClick={() => setShowCategoryModal(true)}
               className="bg-neutral-100 hover:bg-neutral-200 text-neutral-800 px-4 py-2 rounded-xl font-bold text-sm transition-colors"
@@ -200,17 +262,27 @@ export default function Inventory({ data, updateData }: { data: AppData, updateD
           <table className="w-full text-left">
             <thead>
               <tr className="bg-neutral-50 text-neutral-500 text-[10px] uppercase font-bold tracking-wider border-b">
-                <th className="px-6 py-4">Артикул / Назва</th>
-                <th className="px-6 py-4 text-center">Категорія</th>
+                <th className="px-6 py-4 cursor-pointer select-none hover:text-neutral-800" onClick={() => handleSort('name')}>
+                  Артикул / Назва <SortIcon field="name" />
+                </th>
+                <th className="px-6 py-4 text-center cursor-pointer select-none hover:text-neutral-800" onClick={() => handleSort('category')}>
+                  Категорія <SortIcon field="category" />
+                </th>
                 <th className="px-6 py-4 text-center">Постачальник</th>
-                <th className="px-6 py-4 text-center">Залишок</th>
-                <th className="px-6 py-4 text-right">Ціна (Закуп)</th>
-                <th className="px-6 py-4 text-right">Ціна (Продаж)</th>
+                <th className="px-6 py-4 text-center cursor-pointer select-none hover:text-neutral-800" onClick={() => handleSort('stock')}>
+                  Залишок <SortIcon field="stock" />
+                </th>
+                <th className="px-6 py-4 text-right cursor-pointer select-none hover:text-neutral-800" onClick={() => handleSort('purchasePrice')}>
+                  Ціна (Закуп) <SortIcon field="purchasePrice" />
+                </th>
+                <th className="px-6 py-4 text-right cursor-pointer select-none hover:text-neutral-800" onClick={() => handleSort('salePrice')}>
+                  Ціна (Продаж) <SortIcon field="salePrice" />
+                </th>
                 <th className="px-6 py-4"></th>
               </tr>
             </thead>
             <tbody className="divide-y text-sm">
-              {filteredItems.map(item => (
+              {pagedItems.map(item => (
                 <tr key={item.id} className="hover:bg-neutral-50 transition-colors">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
@@ -259,6 +331,47 @@ export default function Inventory({ data, updateData }: { data: AppData, updateD
               ))}
             </tbody>
           </table>
+        </div>
+
+        {/* Pagination footer */}
+        <div className="p-4 border-t flex flex-wrap gap-3 items-center justify-between bg-neutral-50/50 text-sm">
+          <div className="flex items-center gap-2 text-neutral-500">
+            <span>Рядків на сторінці:</span>
+            <select
+              value={itemsPerPage}
+              onChange={(e) => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); }}
+              className="border rounded-lg px-2 py-1 text-sm outline-none focus:ring-2 focus:ring-[#ffcc00]"
+            >
+              {[10, 20, 50, 100].map(n => <option key={n} value={n}>{n}</option>)}
+            </select>
+            <span className="ml-2">
+              {filteredItems.length === 0 ? '0' : `${(safePage - 1) * itemsPerPage + 1}–${Math.min(safePage * itemsPerPage, filteredItems.length)}`} з {filteredItems.length}
+            </span>
+          </div>
+          <div className="flex items-center gap-1">
+            <button onClick={() => setCurrentPage(1)} disabled={safePage === 1} className="p-1.5 rounded-lg hover:bg-neutral-200 disabled:opacity-30">
+              <ChevronsLeft size={16} />
+            </button>
+            <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={safePage === 1} className="p-1.5 rounded-lg hover:bg-neutral-200 disabled:opacity-30">
+              <ChevronLeft size={16} />
+            </button>
+            {pageButtons.map((p, i) =>
+                p === '...'
+                  ? <span key={`ellipsis-${i}`} className="px-2 text-neutral-400">…</span>
+                  : <button
+                      key={p}
+                      onClick={() => setCurrentPage(p as number)}
+                      className={`w-8 h-8 rounded-lg text-sm font-medium ${safePage === p ? 'bg-neutral-900 text-white' : 'hover:bg-neutral-200'}`}
+                    >{p}</button>
+              )
+            }
+            <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={safePage === totalPages} className="p-1.5 rounded-lg hover:bg-neutral-200 disabled:opacity-30">
+              <ChevronRight size={16} />
+            </button>
+            <button onClick={() => setCurrentPage(totalPages)} disabled={safePage === totalPages} className="p-1.5 rounded-lg hover:bg-neutral-200 disabled:opacity-30">
+              <ChevronsRight size={16} />
+            </button>
+          </div>
         </div>
       </div>
 
