@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="uk">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SmartKharkov 🔧 Система управління автомайстернею</title>
+    <meta name="description" content="SmartKharkov — комплексна система управління автомайстернею: наряд-замовлення, склад, клієнти, РРО, Telegram-бот" />
+    <meta name="theme-color" content="#ffcc00" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/logo.svg" />
+    <style>
+      /* Loading screen */
+      #splash {
+        position: fixed; inset: 0;
+        background: #1a1a1a;
+        display: flex; flex-direction: column;
+        align-items: center; justify-content: center;
+        z-index: 9999;
+        transition: opacity 0.4s ease;
+      }
+      #splash.hide { opacity: 0; pointer-events: none; }
+      #splash-logo {
+        width: 96px; height: 96px;
+        animation: pulse 1.2s ease-in-out infinite;
+      }
+      #splash-title {
+        color: #ffcc00;
+        font-family: Arial Black, sans-serif;
+        font-size: 32px;
+        font-weight: 900;
+        margin-top: 16px;
+        letter-spacing: 1px;
+      }
+      #splash-sub {
+        color: #888;
+        font-family: Arial, sans-serif;
+        font-size: 13px;
+        margin-top: 6px;
+      }
+      #splash-dots {
+        margin-top: 24px;
+        display: flex; gap: 8px;
+      }
+      #splash-dots span {
+        width: 8px; height: 8px;
+        background: #ffcc00;
+        border-radius: 50%;
+        animation: dot 1.2s ease-in-out infinite;
+      }
+      #splash-dots span:nth-child(2) { animation-delay: 0.2s; }
+      #splash-dots span:nth-child(3) { animation-delay: 0.4s; }
+      @keyframes pulse {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.08); }
+      }
+      @keyframes dot {
+        0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
+        40% { opacity: 1; transform: scale(1.2); }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Splash screen -->
+    <div id="splash">
+      <img id="splash-logo" src="/logo.svg" alt="SmartKharkov" />
+      <div id="splash-title">SmartKharkov</div>
+      <div id="splash-sub">Система управління автомайстернею</div>
+      <div id="splash-dots">
+        <span></span><span></span><span></span>
+      </div>
+    </div>
+
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+    <script>
+      // Hide splash after React mounts
+      window.addEventListener('load', function() {
+        setTimeout(function() {
+          var splash = document.getElementById('splash');
+          if (splash) {
+            splash.classList.add('hide');
+            setTimeout(function() { splash.remove(); }, 500);
+          }
+        }, 800);
+      });
+    </script>
+  </body>
+</html>
