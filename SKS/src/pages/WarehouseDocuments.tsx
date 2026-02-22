@@ -19,6 +19,22 @@ function applyDocumentToInventory(
   });
 }
 
+function checkStock(
+  docType: WarehouseDocument['type'],
+  items: WarehouseDocumentItem[],
+  inventory: AppData['inventory'],
+): string | null {
+  if (docType === 'incoming') return null;
+  for (const item of items) {
+    const part = inventory.find(p => p.id === item.partId);
+    if (!part) continue;
+    if (part.stock < item.quantity) {
+      return `Недостатньо товару "${part.name}" на складі: є ${part.stock} шт., потрібно ${item.quantity} шт.`;
+    }
+  }
+  return null;
+}
+
 const DOC_TYPE_LABELS: Record<WarehouseDocument['type'], string> = {
   incoming: 'Прихід',
   outgoing: 'Видаток',
@@ -36,6 +52,7 @@ const EMPTY_FORM: Omit<WarehouseDocument, 'id'> = {
   number: '',
   date: new Date().toISOString().split('T')[0],
   supplierId: '',
+  clientId: '',
   note: '',
   items: [],
 };
@@ -67,6 +84,7 @@ export default function WarehouseDocuments({
       number: doc.number,
       date: doc.date,
       supplierId: doc.supplierId || '',
+      clientId: doc.clientId || '',
       note: doc.note || '',
       items: doc.items.map(i => ({ ...i })),
     });
@@ -76,14 +94,18 @@ export default function WarehouseDocuments({
   const handleSave = () => {
     if (!form.number.trim() || !form.date) return;
     if (editingDoc) {
-      // Reverse old document effect, then apply new document effect
+      // Reverse old document effect, then validate and apply new document effect
       let newInventory = applyDocumentToInventory(editingDoc.type, editingDoc.items, data.inventory, -1);
+      const err = checkStock(form.type, form.items, newInventory);
+      if (err) { alert(err); return; }
       newInventory = applyDocumentToInventory(form.type, form.items, newInventory, 1);
       const updated = docs.map(d =>
         d.id === editingDoc.id ? { ...d, ...form } : d
       );
       updateData({ warehouseDocuments: updated, inventory: newInventory });
     } else {
+      const err = checkStock(form.type, form.items, data.inventory);
+      if (err) { alert(err); return; }
       const newInventory = applyDocumentToInventory(form.type, form.items, data.inventory, 1);
       const newDoc: WarehouseDocument = { id: generateId(), ...form };
       updateData({ warehouseDocuments: [newDoc, ...docs], inventory: newInventory });
@@ -171,9 +193,14 @@ export default function WarehouseDocuments({
                     <p className="font-bold text-sm text-neutral-900">{doc.number}</p>
                     <p className="text-xs text-neutral-400">{doc.date}</p>
                   </div>
-                  {doc.supplierId && (
+                  {doc.supplierId && doc.type === 'incoming' && (
                     <span className="text-xs text-neutral-500 hidden md:block">
                       {data.suppliers.find(s => s.id === doc.supplierId)?.name || ''}
+                    </span>
+                  )}
+                  {doc.clientId && doc.type === 'outgoing' && (
+                    <span className="text-xs text-neutral-500 hidden md:block">
+                      {data.clients.find(c => c.id === doc.clientId)?.name || ''}
                     </span>
                   )}
                   <span className="font-bold text-sm text-neutral-700">
@@ -288,19 +315,35 @@ export default function WarehouseDocuments({
                     className="w-full p-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#ffcc00]"
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-neutral-700 mb-1">Постачальник</label>
-                  <select
-                    value={form.supplierId || ''}
-                    onChange={e => setForm({ ...form, supplierId: e.target.value })}
-                    className="w-full p-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#ffcc00]"
-                  >
-                    <option value="">— не вказано —</option>
-                    {data.suppliers.map(s => (
-                      <option key={s.id} value={s.id}>{s.name}</option>
-                    ))}
-                  </select>
-                </div>
+                {form.type === 'outgoing' ? (
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-700 mb-1">Клієнт</label>
+                    <select
+                      value={form.clientId || ''}
+                      onChange={e => setForm({ ...form, clientId: e.target.value })}
+                      className="w-full p-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#ffcc00]"
+                    >
+                      <option value="">— не вказано —</option>
+                      {data.clients.map(c => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                ) : form.type === 'incoming' ? (
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-700 mb-1">Постачальник</label>
+                    <select
+                      value={form.supplierId || ''}
+                      onChange={e => setForm({ ...form, supplierId: e.target.value })}
+                      className="w-full p-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#ffcc00]"
+                    >
+                      <option value="">— не вказано —</option>
+                      {data.suppliers.map(s => (
+                        <option key={s.id} value={s.id}>{s.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                ) : null}
               </div>
 
               <div>
@@ -328,41 +371,52 @@ export default function WarehouseDocuments({
                   </button>
                 </div>
                 <div className="space-y-2">
-                  {form.items.map((item, idx) => (
-                    <div key={idx} className="grid grid-cols-[1fr_80px_90px_32px] gap-2 items-center">
-                      <select
-                        value={item.partId}
-                        onChange={e => updateItem(idx, { partId: e.target.value })}
-                        className="p-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#ffcc00] text-sm"
-                      >
-                        {data.inventory.map(p => (
-                          <option key={p.id} value={p.id}>{p.name}</option>
-                        ))}
-                      </select>
-                      <input
-                        type="number"
-                        min={1}
-                        value={item.quantity}
-                        onChange={e => updateItem(idx, { quantity: Number(e.target.value) })}
-                        className="p-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#ffcc00] text-sm"
-                        placeholder="Кіл."
-                      />
-                      <input
-                        type="number"
-                        min={0}
-                        value={item.price}
-                        onChange={e => updateItem(idx, { price: Number(e.target.value) })}
-                        className="p-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#ffcc00] text-sm"
-                        placeholder="Ціна"
-                      />
-                      <button
-                        onClick={() => removeItem(idx)}
-                        className="p-1.5 text-red-400 hover:text-red-600 rounded-lg hover:bg-red-50"
-                      >
-                        <X size={15} />
-                      </button>
-                    </div>
-                  ))}
+                  {form.items.map((item, idx) => {
+                    const part = data.inventory.find(p => p.id === item.partId);
+                    const insufficient = form.type !== 'incoming' && !!part && part.stock < item.quantity;
+                    return (
+                      <div key={idx} className="space-y-0.5">
+                        <div className="grid grid-cols-[1fr_80px_90px_32px] gap-2 items-center">
+                          <select
+                            value={item.partId}
+                            onChange={e => updateItem(idx, { partId: e.target.value })}
+                            className="p-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#ffcc00] text-sm"
+                          >
+                            {data.inventory.map(p => (
+                              <option key={p.id} value={p.id}>{p.name} (залишок: {p.stock} шт.)</option>
+                            ))}
+                          </select>
+                          <input
+                            type="number"
+                            min={1}
+                            value={item.quantity}
+                            onChange={e => updateItem(idx, { quantity: Number(e.target.value) })}
+                            className={`p-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#ffcc00] text-sm ${insufficient ? 'border-red-400 bg-red-50' : ''}`}
+                            placeholder="Кіл."
+                          />
+                          <input
+                            type="number"
+                            min={0}
+                            value={item.price}
+                            onChange={e => updateItem(idx, { price: Number(e.target.value) })}
+                            className="p-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#ffcc00] text-sm"
+                            placeholder="Ціна"
+                          />
+                          <button
+                            onClick={() => removeItem(idx)}
+                            className="p-1.5 text-red-400 hover:text-red-600 rounded-lg hover:bg-red-50"
+                          >
+                            <X size={15} />
+                          </button>
+                        </div>
+                        {insufficient && (
+                          <p className="text-xs text-red-500 pl-1">
+                            На складі лише {part?.stock} шт.
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>
