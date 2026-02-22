@@ -73,6 +73,18 @@ export function loadDbExtras(): DbExtras {
       { id: 'vm6', make: 'Kia', models: [{ id: 'm14', name: 'Sportage', years: '2015-2024' }, { id: 'm15', name: 'Cerato', years: '2013-2024' }] },
       { id: 'vm7', make: 'Mercedes-Benz', models: [{ id: 'm16', name: 'E-Class', years: '2010-2024' }, { id: 'm17', name: 'C-Class', years: '2005-2024' }] },
       { id: 'vm8', make: 'Renault', models: [{ id: 'm18', name: 'Logan', years: '2005-2024' }, { id: 'm19', name: 'Megane', years: '2002-2020' }] },
+      { id: 'vm9', make: 'Smart', models: [
+        { id: 'sm1', name: 'Fortwo (450)', years: '1998-2007' },
+        { id: 'sm2', name: 'Fortwo (451)', years: '2007-2014' },
+        { id: 'sm3', name: 'Fortwo (453)', years: '2014-2019' },
+        { id: 'sm4', name: 'Roadster (452)', years: '2003-2006' },
+        { id: 'sm5', name: 'Forfour (454)', years: '2004-2006' },
+        { id: 'sm6', name: 'Forfour (453)', years: '2014-2019' },
+        { id: 'sm7', name: 'EQ Fortwo', years: '2017-2024' },
+        { id: 'sm8', name: 'EQ Forfour', years: '2017-2024' },
+        { id: 'sm9', name: '#1', years: '2022-2024' },
+        { id: 'sm10', name: '#3', years: '2023-2024' },
+      ]},
     ],
     catalogParts: [
       { id: 'cp1', oem: 'TOY-04152-YZZA6', name: 'Фільтр масляний Toyota', brand: 'Toyota OEM', category: 'Фільтри', compatibleMakes: ['Toyota'], purchasePrice: 280, salePrice: 520, description: 'Оригінальний фільтр масляний' },

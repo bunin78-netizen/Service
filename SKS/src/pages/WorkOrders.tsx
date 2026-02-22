@@ -4,7 +4,7 @@ import {
   Plus, Search, FileText, Printer, Stethoscope, CheckCircle,
   AlertTriangle, XCircle, ChevronDown, ChevronUp, X, Save,
   Trash2, CreditCard, Banknote, Building, Edit2, RotateCcw,
-  ClipboardList, Clock, History, Filter, Eye
+  ClipboardList, Clock, History, Filter, Eye, Car
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { generateId, generateOrderId } from '../store';
@@ -524,6 +524,22 @@ export default function WorkOrders({ data, updateData, addNotification, openDiag
               </select>
             </div>
           </div>
+
+          {/* Selected client car info */}
+          {orderForm.clientId && (() => {
+            const selectedClient = data.clients.find(c => c.id === orderForm.clientId);
+            if (!selectedClient) return null;
+            return (
+              <div className="flex items-center gap-3 p-3 bg-[#ffcc00]/10 border border-[#ffcc00]/40 rounded-xl text-sm">
+                <Car size={18} className="text-[#ffcc00] shrink-0" />
+                <div className="flex flex-wrap gap-x-4 gap-y-0.5">
+                  <span className="font-bold text-neutral-800">{selectedClient.car.make} {selectedClient.car.model} ({selectedClient.car.year})</span>
+                  <span className="font-mono text-neutral-600">{selectedClient.car.plate}</span>
+                  {selectedClient.car.vin && <span className="font-mono text-neutral-400 text-xs">VIN: {selectedClient.car.vin}</span>}
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Payment type */}
           <div>
