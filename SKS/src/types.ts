@@ -156,6 +156,7 @@ export type WarehouseDocument = {
   number: string;
   date: string;
   supplierId?: string;
+  clientId?: string;
   note?: string;
   items: WarehouseDocumentItem[];
 };
