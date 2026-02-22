@@ -39,12 +39,16 @@ const DOC_TYPE_LABELS: Record<WarehouseDocument['type'], string> = {
   incoming: 'Прихід',
   outgoing: 'Видаток',
   writeoff: 'Списання',
+  inventory: 'Інвентаризація',
+  return: 'Повернення',
 };
 
 const DOC_TYPE_COLORS: Record<WarehouseDocument['type'], string> = {
   incoming: 'bg-green-100 text-green-700',
   outgoing: 'bg-blue-100 text-blue-700',
   writeoff: 'bg-red-100 text-red-700',
+  inventory: 'bg-purple-100 text-purple-700',
+  return: 'bg-orange-100 text-orange-700',
 };
 
 const EMPTY_FORM: Omit<WarehouseDocument, 'id'> = {

@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { AppData, Supplier, Part } from '../types';
+import { AppData, Supplier, Part, WarehouseDocument, WarehouseDocumentItem } from '../types';
 import { generateId } from '../store';
 import {
   Car, Package, Wrench, Users, FileText, Truck,
@@ -45,32 +45,11 @@ export type DocumentTemplate = {
   createdAt: string;
 };
 
-export type WarehouseDocumentItem = {
-  id: string;
-  partId?: string;
-  name: string;
-  quantity: number;
-  price: number;
-};
-
-export type WarehouseDocument = {
-  id: string;
-  number: string;
-  type: 'incoming' | 'outgoing' | 'inventory' | 'return';
-  date: string;
-  supplierId?: string;
-  items: WarehouseDocumentItem[];
-  notes?: string;
-  status: 'draft' | 'completed';
-  createdAt: string;
-};
-
 export type DbExtras = {
   vehicleMakes: VehicleMake[];
   catalogParts: CatalogPart[];
   workNorms: WorkNorm[];
   documentTemplates: DocumentTemplate[];
-  warehouseDocuments: WarehouseDocument[];
 };
 
 const DB_KEY = 'smartkharkov_db_extras';
@@ -82,7 +61,6 @@ export function loadDbExtras(): DbExtras {
     // Ensure new fields are present when loading older stored data
     return {
       ...parsed,
-      warehouseDocuments: parsed.warehouseDocuments || [],
     };
   }
   return {
@@ -128,44 +106,6 @@ export function loadDbExtras(): DbExtras {
       { id: 'dt3', name: 'Рахунок-фактура', type: 'invoice', content: 'Шаблон рахунку-фактури', createdAt: '2024-01-01' },
       { id: 'dt4', name: 'Договір на обслуговування', type: 'contract', content: 'Договір технічного обслуговування', createdAt: '2024-01-01' },
     ],
-    warehouseDocuments: [
-      {
-        id: 'wd1', number: 'ПРХ-0001', type: 'incoming', date: '2023-10-01',
-        supplierId: 's1', status: 'completed', createdAt: '2023-10-01',
-        notes: 'Планова закупівля мастил',
-        items: [
-          { id: 'wdi1', partId: '1', name: 'Мастило 5W30 4л', quantity: 10, price: 1200 },
-          { id: 'wdi2', partId: '4', name: 'Антифриз G12 5л', quantity: 5, price: 450 },
-        ],
-      },
-      {
-        id: 'wd2', number: 'РЗХ-0001', type: 'outgoing', date: '2023-10-10',
-        status: 'completed', createdAt: '2023-10-10',
-        notes: 'Списання за наряд WO-1001',
-        items: [
-          { id: 'wdi3', partId: '1', name: 'Мастило 5W30 4л', quantity: 1, price: 1800 },
-          { id: 'wdi4', partId: '2', name: 'Фільтр масляний', quantity: 1, price: 350 },
-        ],
-      },
-      {
-        id: 'wd3', number: 'ІНВ-0001', type: 'inventory', date: '2023-10-15',
-        status: 'completed', createdAt: '2023-10-15',
-        notes: 'Планова щомісячна інвентаризація',
-        items: [
-          { id: 'wdi5', partId: '1', name: 'Мастило 5W30 4л', quantity: 15, price: 1200 },
-          { id: 'wdi6', partId: '2', name: 'Фільтр масляний', quantity: 2, price: 150 },
-          { id: 'wdi7', partId: '3', name: 'Колодки гальмівні передні', quantity: 4, price: 800 },
-        ],
-      },
-      {
-        id: 'wd4', number: 'ПВР-0001', type: 'return', date: '2023-10-08',
-        supplierId: 's2', status: 'completed', createdAt: '2023-10-08',
-        notes: 'Повернення бракованого товару',
-        items: [
-          { id: 'wdi8', partId: '2', name: 'Фільтр масляний', quantity: 2, price: 150 },
-        ],
-      },
-    ],
   };
 }
 
@@ -198,7 +138,7 @@ export default function Database({ data, updateData }: Props) {
     { id: 'clients', label: 'Клієнти', icon: <Users size={16} />, count: data.clients.length },
     { id: 'documents', label: 'Документи', icon: <FileText size={16} />, count: db.documentTemplates.length },
     { id: 'suppliers', label: 'Постачальники', icon: <Truck size={16} />, count: data.suppliers.length },
-    { id: 'warehouse', label: 'Складські документи', icon: <ClipboardList size={16} />, count: db.warehouseDocuments.length },
+    { id: 'warehouse', label: 'Складські документи', icon: <ClipboardList size={16} />, count: data.warehouseDocuments.length },
   ];
 
   return (
@@ -251,7 +191,7 @@ export default function Database({ data, updateData }: Props) {
       {activeTab === 'clients' && <ClientsDbTab data={data} search={search} updateData={updateData} />}
       {activeTab === 'documents' && <DocumentsTab db={db} saveDb={saveDb} search={search} data={data} />}
       {activeTab === 'suppliers' && <SuppliersTab data={data} updateData={updateData} search={search} />}
-      {activeTab === 'warehouse' && <WarehouseDocumentsTab db={db} saveDb={saveDb} search={search} data={data} updateData={updateData} />}
+      {activeTab === 'warehouse' && <WarehouseDocumentsTab search={search} data={data} updateData={updateData} />}
     </div>
   );
 }
@@ -1164,10 +1104,8 @@ function SuppliersTab({ data, updateData, search }: { data: AppData; updateData:
 
 // ─── Warehouse Documents Tab ──────────────────────────────────────────────────
 function WarehouseDocumentsTab({
-  db, saveDb, search, data, updateData,
+  search, data, updateData,
 }: {
-  db: DbExtras;
-  saveDb: (d: DbExtras) => void;
   search: string;
   data: AppData;
   updateData: (d: Partial<AppData>) => void;
@@ -1179,35 +1117,40 @@ function WarehouseDocumentsTab({
   const [form, setForm] = useState<Partial<WarehouseDocument>>({});
   const [itemForm, setItemForm] = useState<Partial<WarehouseDocumentItem>>({ name: '', quantity: 1, price: 0 });
 
+  const warehouseDocs = data.warehouseDocuments || [];
+
   const typeConfig: Record<WarehouseDocument['type'], { label: string; icon: React.ReactNode; color: string; badgeColor: string; number: string }> = {
     incoming:  { label: 'Прихід',         icon: <ArrowDownCircle size={16} />, color: 'text-green-600',  badgeColor: 'bg-green-100 text-green-700',  number: 'ПРХ' },
     outgoing:  { label: 'Розхід',         icon: <ArrowUpCircle   size={16} />, color: 'text-red-600',    badgeColor: 'bg-red-100 text-red-700',      number: 'РЗХ' },
+    writeoff:  { label: 'Списання',       icon: <Trash2          size={16} />, color: 'text-yellow-600', badgeColor: 'bg-yellow-100 text-yellow-700', number: 'СП' },
     inventory: { label: 'Інвентаризація', icon: <ClipboardList   size={16} />, color: 'text-blue-600',   badgeColor: 'bg-blue-100 text-blue-700',    number: 'ІНВ' },
     return:    { label: 'Повернення',     icon: <RotateCcw       size={16} />, color: 'text-orange-600', badgeColor: 'bg-orange-100 text-orange-700', number: 'ПВР' },
   };
 
   const filtered = useMemo(() =>
-    db.warehouseDocuments.filter(d => {
+    warehouseDocs.filter(d => {
+      const noteText = d.notes || d.note || '';
       const matchesSearch =
         d.number.toLowerCase().includes(search.toLowerCase()) ||
-        (d.notes || '').toLowerCase().includes(search.toLowerCase()) ||
-        d.items.some(i => i.name.toLowerCase().includes(search.toLowerCase()));
+        noteText.toLowerCase().includes(search.toLowerCase()) ||
+        d.items.some(i => (i.name || data.inventory.find(p => p.id === i.partId)?.name || '').toLowerCase().includes(search.toLowerCase()));
       const matchesType = typeFilter === 'all' || d.type === typeFilter;
       return matchesSearch && matchesType;
     }).sort((a, b) => b.date.localeCompare(a.date)),
-    [db.warehouseDocuments, search, typeFilter]
+    [warehouseDocs, search, typeFilter, data.inventory]
   );
 
   const generateDocNumber = (type: WarehouseDocument['type']) => {
     const prefix = typeConfig[type].number;
-    const existing = db.warehouseDocuments.filter(d => d.type === type).length;
+    const existing = warehouseDocs.filter(d => d.type === type).length;
     return `${prefix}-${String(existing + 1).padStart(4, '0')}`;
   };
 
   const openModal = (doc?: WarehouseDocument) => {
     if (doc) {
       setEditDoc(doc);
-      setForm({ ...doc });
+      // Ensure all items have an id for stable removal in the modal
+      setForm({ ...doc, items: doc.items.map(i => ({ ...i, id: i.id || generateId() })) });
     } else {
       setEditDoc(null);
       setForm({
@@ -1227,7 +1170,7 @@ function WarehouseDocumentsTab({
     if (!itemForm.name || !itemForm.quantity) return;
     const newItem: WarehouseDocumentItem = {
       id: generateId(),
-      partId: itemForm.partId,
+      partId: itemForm.partId || '',
       name: itemForm.name!,
       quantity: itemForm.quantity || 1,
       price: itemForm.price || 0,
@@ -1238,9 +1181,7 @@ function WarehouseDocumentsTab({
 
   const handleRemoveItem = (itemId: string) => {
     setForm(prev => ({ ...prev, items: (prev.items || []).filter(i => i.id !== itemId) }));
-  };
-
-  const handlePartSelect = (partId: string) => {
+  };  const handlePartSelect = (partId: string) => {
     const part = data.inventory.find((p: Part) => p.id === partId);
     if (part) {
       setItemForm(prev => ({
@@ -1275,7 +1216,7 @@ function WarehouseDocumentsTab({
         if (idx === -1) return;
         if (doc.type === 'incoming') {
           updatedInventory[idx] = { ...updatedInventory[idx], stock: updatedInventory[idx].stock + item.quantity };
-        } else if (doc.type === 'outgoing' || doc.type === 'return') {
+        } else if (doc.type === 'outgoing' || doc.type === 'return' || doc.type === 'writeoff') {
           updatedInventory[idx] = { ...updatedInventory[idx], stock: Math.max(0, updatedInventory[idx].stock - item.quantity) };
         } else if (doc.type === 'inventory') {
           updatedInventory[idx] = { ...updatedInventory[idx], stock: item.quantity };
@@ -1285,16 +1226,16 @@ function WarehouseDocumentsTab({
     }
 
     if (editDoc) {
-      saveDb({ ...db, warehouseDocuments: db.warehouseDocuments.map(d => d.id === editDoc.id ? doc : d) });
+      updateData({ warehouseDocuments: warehouseDocs.map(d => d.id === editDoc.id ? doc : d) });
     } else {
-      saveDb({ ...db, warehouseDocuments: [...db.warehouseDocuments, doc] });
+      updateData({ warehouseDocuments: [...warehouseDocs, doc] });
     }
     setShowModal(false);
   };
 
   const handleDelete = (id: string) => {
     if (!confirm('Видалити документ?')) return;
-    saveDb({ ...db, warehouseDocuments: db.warehouseDocuments.filter(d => d.id !== id) });
+    updateData({ warehouseDocuments: warehouseDocs.filter(d => d.id !== id) });
   };
 
   const totalItems = filtered.reduce((acc, d) => acc + d.items.reduce((a, i) => a + i.quantity, 0), 0);
@@ -1303,10 +1244,10 @@ function WarehouseDocumentsTab({
   return (
     <div className="space-y-4">
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         {(Object.keys(typeConfig) as WarehouseDocument['type'][]).map(t => {
           const cfg = typeConfig[t];
-          const count = db.warehouseDocuments.filter(d => d.type === t).length;
+          const count = warehouseDocs.filter(d => d.type === t).length;
           return (
             <div key={t} className="bg-white rounded-xl border shadow-sm p-4 flex items-center gap-3">
               <div className={`p-2 rounded-lg bg-neutral-100 ${cfg.color}`}>{cfg.icon}</div>
@@ -1326,7 +1267,7 @@ function WarehouseDocumentsTab({
             onClick={() => setTypeFilter('all')}
             className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${typeFilter === 'all' ? 'bg-neutral-900 text-white' : 'bg-neutral-100 hover:bg-neutral-200'}`}
           >
-            Всі ({db.warehouseDocuments.length})
+            Всі ({warehouseDocs.length})
           </button>
           {(Object.keys(typeConfig) as WarehouseDocument['type'][]).map(t => (
             <button
@@ -1380,14 +1321,14 @@ function WarehouseDocumentsTab({
                     <div className="flex items-center gap-2">
                       <span className="font-bold font-mono">{doc.number}</span>
                       <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${cfg.badgeColor}`}>{cfg.label}</span>
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${doc.status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                        {doc.status === 'completed' ? 'Проведено' : 'Чернетка'}
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${(doc.status ?? 'completed') === 'completed' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                        {(doc.status ?? 'completed') === 'completed' ? 'Проведено' : 'Чернетка'}
                       </span>
                     </div>
                     <div className="flex items-center gap-3 mt-0.5 text-xs text-neutral-500">
                       <span>{doc.date}</span>
                       {supplier && <span>• {supplier.name}</span>}
-                      {doc.notes && <span className="truncate max-w-xs">• {doc.notes}</span>}
+                      {(doc.notes || doc.note) && <span className="truncate max-w-xs">• {doc.notes || doc.note}</span>}
                     </div>
                   </div>
                 </div>
@@ -1416,14 +1357,17 @@ function WarehouseDocumentsTab({
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-neutral-100">
-                      {doc.items.map(item => (
-                        <tr key={item.id} className="bg-white">
-                          <td className="px-4 py-2.5 font-medium">{item.name}</td>
+                      {doc.items.map((item, idx) => {
+                        const partName = item.name || data.inventory.find(p => p.id === item.partId)?.name || '(невідомо)';
+                        return (
+                        <tr key={item.id || idx} className="bg-white">
+                          <td className="px-4 py-2.5 font-medium">{partName}</td>
                           <td className="px-4 py-2.5 text-center">{item.quantity} шт</td>
                           <td className="px-4 py-2.5 text-right text-neutral-500">{item.price.toLocaleString()} ₴</td>
                           <td className="px-4 py-2.5 text-right font-bold">{(item.quantity * item.price).toLocaleString()} ₴</td>
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                     <tfoot className="bg-neutral-100 font-bold">
                       <tr>
@@ -1586,19 +1530,22 @@ function WarehouseDocumentsTab({
                         </tr>
                       </thead>
                       <tbody className="divide-y">
-                        {(form.items || []).map(item => (
-                          <tr key={item.id} className="hover:bg-neutral-50">
-                            <td className="px-3 py-2 font-medium">{item.name}</td>
+                        {(form.items || []).map((item, idx) => {
+                          const itemName = item.name || data.inventory.find(p => p.id === item.partId)?.name || '';
+                          return (
+                          <tr key={item.id || idx} className="hover:bg-neutral-50">
+                            <td className="px-3 py-2 font-medium">{itemName}</td>
                             <td className="px-3 py-2 text-center">{item.quantity}</td>
                             <td className="px-3 py-2 text-right text-neutral-500">{item.price.toLocaleString()} ₴</td>
                             <td className="px-3 py-2 text-right font-bold">{(item.quantity * item.price).toLocaleString()} ₴</td>
                             <td className="px-3 py-2 text-right">
-                              <button onClick={() => handleRemoveItem(item.id)} className="text-neutral-300 hover:text-red-500">
+                              <button onClick={() => item.id && handleRemoveItem(item.id)} className="text-neutral-300 hover:text-red-500">
                                 <Trash2 size={12} />
                               </button>
                             </td>
                           </tr>
-                        ))}
+                          );
+                        })}
                       </tbody>
                       <tfoot className="bg-neutral-50 font-bold border-t">
                         <tr>

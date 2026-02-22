@@ -168,9 +168,11 @@ const INITIAL_DATA: AppData = {
       date: '2023-10-01',
       supplierId: 's1',
       note: 'Перше надходження',
+      status: 'completed',
+      createdAt: '2023-10-01',
       items: [
-        { partId: '1', quantity: 10, price: 1200 },
-        { partId: '4', quantity: 5, price: 450 },
+        { id: 'wdi1', partId: '1', name: 'Мастило 5W30 4л', quantity: 10, price: 1200 },
+        { id: 'wdi2', partId: '4', name: 'Антифриз G12 5л', quantity: 5, price: 450 },
       ],
     },
     {
@@ -180,8 +182,10 @@ const INITIAL_DATA: AppData = {
       date: '2023-10-08',
       supplierId: 's4',
       note: '',
+      status: 'completed',
+      createdAt: '2023-10-08',
       items: [
-        { partId: '5', quantity: 12, price: 320 },
+        { id: 'wdi3', partId: '5', name: 'Свічки NGK комплект', quantity: 12, price: 320 },
       ],
     },
     {
@@ -190,8 +194,10 @@ const INITIAL_DATA: AppData = {
       number: 'СП-0001',
       date: '2023-10-10',
       note: 'Пошкоджені товари',
+      status: 'completed',
+      createdAt: '2023-10-10',
       items: [
-        { partId: '2', quantity: 1, price: 150 },
+        { id: 'wdi4', partId: '2', name: 'Фільтр масляний', quantity: 1, price: 150 },
       ],
     },
   ],
