@@ -1,10 +1,10 @@
 import { useState, useMemo } from 'react';
-import { AppData, WorkOrder, Notification, DiagnosticCard } from '../types';
+import { AppData, WorkOrder, Notification, DiagnosticCard, Client } from '../types';
 import {
   Plus, Search, FileText, Printer, Stethoscope, CheckCircle,
   AlertTriangle, XCircle, ChevronDown, ChevronUp, X, Save,
   Trash2, CreditCard, Banknote, Building, Edit2, RotateCcw,
-  ClipboardList, Clock, History, Filter, Eye, Car
+  ClipboardList, Clock, History, Filter, Eye, Car, User
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { generateId, generateOrderId } from '../store';
@@ -106,6 +106,11 @@ const emptyOrderForm = (): OrderForm => ({
   parts: [],
 });
 
+const emptyQuickClientForm = (): Omit<Client, 'id' | 'createdAt'> => ({
+  name: '', phone: '', email: '',
+  car: { make: '', model: '', year: new Date().getFullYear(), vin: '', plate: '' }
+});
+
 export default function WorkOrders({ data, updateData, addNotification, openDiagnosisByDefault = false }: WorkOrdersProps) {
   const db = loadDbExtras();
   const currentUser = data.users.find(u => u.id === data.currentUserId);
@@ -121,6 +126,8 @@ export default function WorkOrders({ data, updateData, addNotification, openDiag
   const [diagOrderId, setDiagOrderId] = useState<string | null>(null);
   const [log] = useState<DocumentLog[]>(loadLog());
   const [showNormsDropdown, setShowNormsDropdown] = useState<number | null>(null);
+  const [showAddClientModal, setShowAddClientModal] = useState(false);
+  const [quickClientForm, setQuickClientForm] = useState<Omit<Client, 'id' | 'createdAt'>>(emptyQuickClientForm());
 
   // ── Filtered orders ──────────────────────────────────────────────────────
   const filteredOrders = useMemo(() => {
@@ -291,6 +298,23 @@ export default function WorkOrders({ data, updateData, addNotification, openDiag
     updated[idx] = { ...updated[idx], name: norm.name, price: norm.price, hours: norm.hours };
     setOrderForm({ ...orderForm, services: updated });
     setShowNormsDropdown(null);
+  };
+
+  // ── Quick Add Client ───────────────────────────────────────────────────────
+  const handleQuickAddClient = () => {
+    if (!quickClientForm.name.trim() || !quickClientForm.phone.trim()) {
+      alert('Будь ласка, заповніть обов\'язкові поля (Ім\'я та Телефон)');
+      return;
+    }
+    const newClient: Client = {
+      id: generateId(),
+      ...quickClientForm,
+      createdAt: format(new Date(), 'yyyy-MM-dd'),
+    };
+    updateData({ clients: [...data.clients, newClient] });
+    setOrderForm({ ...orderForm, clientId: newClient.id });
+    setShowAddClientModal(false);
+    setQuickClientForm(emptyQuickClientForm());
   };
 
   // ── Print Act ─────────────────────────────────────────────────────────────
@@ -499,16 +523,26 @@ export default function WorkOrders({ data, updateData, addNotification, openDiag
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-bold text-neutral-600 mb-1">Клієнт *</label>
-              <select
-                value={orderForm.clientId}
-                onChange={e => setOrderForm({ ...orderForm, clientId: e.target.value })}
-                className="w-full p-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#ffcc00]"
-              >
-                <option value="">Оберіть клієнта...</option>
-                {data.clients.map(c => (
-                  <option key={c.id} value={c.id}>{c.name} — {c.car.plate}</option>
-                ))}
-              </select>
+              <div className="flex gap-2">
+                <select
+                  value={orderForm.clientId}
+                  onChange={e => setOrderForm({ ...orderForm, clientId: e.target.value })}
+                  className="flex-1 p-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#ffcc00]"
+                >
+                  <option value="">Оберіть клієнта...</option>
+                  {data.clients.map(c => (
+                    <option key={c.id} value={c.id}>{c.name} — {c.car.plate}</option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => setShowAddClientModal(true)}
+                  className="bg-[#ffcc00] text-black px-3 py-2 rounded-lg font-bold flex items-center gap-1 hover:bg-[#e6b800] transition-colors shrink-0 text-sm"
+                  title="Додати клієнта"
+                >
+                  <Plus size={15} /> Додати клієнта
+                </button>
+              </div>
             </div>
             <div>
               <label className="block text-sm font-bold text-neutral-600 mb-1">Відповідальний майстер</label>
@@ -1223,6 +1257,135 @@ export default function WorkOrders({ data, updateData, addNotification, openDiag
                 className="bg-neutral-900 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2"
               >
                 <Clock size={14} /> Експорт CSV
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Quick Add Client Modal ── */}
+      {showAddClientModal && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[60] p-4">
+          <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden">
+            <div className="p-5 border-b bg-neutral-50 flex items-center justify-between">
+              <h3 className="font-bold text-lg flex items-center gap-2">
+                <User className="text-[#ffcc00]" size={20} /> Новий клієнт
+              </h3>
+              <button onClick={() => setShowAddClientModal(false)} className="text-neutral-400 hover:text-neutral-600">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium text-neutral-700 mb-1">Ім'я *</label>
+                  <input
+                    type="text"
+                    value={quickClientForm.name}
+                    onChange={e => setQuickClientForm({ ...quickClientForm, name: e.target.value })}
+                    className="w-full p-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#ffcc00]"
+                    placeholder="Повне ім'я клієнта"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-neutral-700 mb-1">Телефон *</label>
+                  <input
+                    type="tel"
+                    value={quickClientForm.phone}
+                    onChange={e => setQuickClientForm({ ...quickClientForm, phone: e.target.value })}
+                    className="w-full p-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#ffcc00]"
+                    placeholder="+380..."
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-neutral-700 mb-1">Email</label>
+                  <input
+                    type="email"
+                    value={quickClientForm.email || ''}
+                    onChange={e => setQuickClientForm({ ...quickClientForm, email: e.target.value })}
+                    className="w-full p-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#ffcc00]"
+                    placeholder="email@example.com"
+                  />
+                </div>
+              </div>
+              <div className="pt-2 border-t">
+                <h4 className="font-bold text-sm text-neutral-600 mb-3 flex items-center gap-2">
+                  <Car size={16} /> Автомобіль
+                </h4>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-700 mb-1">Марка</label>
+                    <select
+                      value={quickClientForm.car.make}
+                      onChange={e => setQuickClientForm({ ...quickClientForm, car: { ...quickClientForm.car, make: e.target.value, model: '' } })}
+                      className="w-full p-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#ffcc00]"
+                    >
+                      <option value="">Оберіть марку...</option>
+                      {db.vehicleMakes.map(vm => (
+                        <option key={vm.id} value={vm.make}>{vm.make}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-700 mb-1">Модель</label>
+                    <select
+                      value={quickClientForm.car.model}
+                      onChange={e => setQuickClientForm({ ...quickClientForm, car: { ...quickClientForm.car, model: e.target.value } })}
+                      className="w-full p-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#ffcc00]"
+                      disabled={!quickClientForm.car.make}
+                    >
+                      <option value="">Оберіть модель...</option>
+                      {(db.vehicleMakes.find(vm => vm.make === quickClientForm.car.make)?.models || []).map(m => (
+                        <option key={m.id} value={m.name}>{m.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-700 mb-1">Рік</label>
+                    <input
+                      type="number"
+                      value={quickClientForm.car.year}
+                      onChange={e => setQuickClientForm({ ...quickClientForm, car: { ...quickClientForm.car, year: Number(e.target.value) } })}
+                      className="w-full p-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#ffcc00]"
+                      placeholder="2020"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-700 mb-1">Держ. номер</label>
+                    <input
+                      type="text"
+                      value={quickClientForm.car.plate}
+                      onChange={e => setQuickClientForm({ ...quickClientForm, car: { ...quickClientForm.car, plate: e.target.value.toUpperCase() } })}
+                      className="w-full p-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#ffcc00] font-mono"
+                      placeholder="AX1234AB"
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-sm font-medium text-neutral-700 mb-1">VIN-код</label>
+                    <input
+                      type="text"
+                      value={quickClientForm.car.vin}
+                      onChange={e => setQuickClientForm({ ...quickClientForm, car: { ...quickClientForm.car, vin: e.target.value.toUpperCase() } })}
+                      className="w-full p-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#ffcc00] font-mono"
+                      placeholder="17-значний VIN"
+                      maxLength={17}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="p-5 border-t bg-neutral-50 flex gap-3 justify-end">
+              <button
+                onClick={() => setShowAddClientModal(false)}
+                className="px-5 py-2 rounded-lg font-medium text-neutral-600 hover:bg-neutral-100"
+              >
+                Скасувати
+              </button>
+              <button
+                onClick={handleQuickAddClient}
+                className="bg-[#ffcc00] text-black px-5 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-[#e6b800]"
+              >
+                <Save size={16} /> Додати та вибрати
               </button>
             </div>
           </div>
