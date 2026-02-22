@@ -1,10 +1,11 @@
 import { useState, useMemo } from 'react';
-import { AppData, Supplier } from '../types';
+import { AppData, Supplier, Part } from '../types';
 import { generateId } from '../store';
 import {
   Car, Package, Wrench, Users, FileText, Truck,
   Plus, Search, Edit2, Trash2, X, Save, ChevronDown, ChevronUp,
-  Clock, DollarSign, Phone, Mail, Globe, Hash
+  Clock, DollarSign, Phone, Mail, Globe, Hash,
+  ArrowDownCircle, ArrowUpCircle, ClipboardList, RotateCcw,
 } from 'lucide-react';
 
 // ─── Extra DB Types (stored in AppData.dbExtras via localStorage) ────────────
@@ -44,18 +45,46 @@ export type DocumentTemplate = {
   createdAt: string;
 };
 
+export type WarehouseDocumentItem = {
+  id: string;
+  partId?: string;
+  name: string;
+  quantity: number;
+  price: number;
+};
+
+export type WarehouseDocument = {
+  id: string;
+  number: string;
+  type: 'incoming' | 'outgoing' | 'inventory' | 'return';
+  date: string;
+  supplierId?: string;
+  items: WarehouseDocumentItem[];
+  notes?: string;
+  status: 'draft' | 'completed';
+  createdAt: string;
+};
+
 export type DbExtras = {
   vehicleMakes: VehicleMake[];
   catalogParts: CatalogPart[];
   workNorms: WorkNorm[];
   documentTemplates: DocumentTemplate[];
+  warehouseDocuments: WarehouseDocument[];
 };
 
 const DB_KEY = 'smartkharkov_db_extras';
 
 export function loadDbExtras(): DbExtras {
   const raw = localStorage.getItem(DB_KEY);
-  if (raw) return JSON.parse(raw);
+  if (raw) {
+    const parsed = JSON.parse(raw);
+    // Ensure new fields are present when loading older stored data
+    return {
+      ...parsed,
+      warehouseDocuments: parsed.warehouseDocuments || [],
+    };
+  }
   return {
     vehicleMakes: [
       { id: 'vm1', make: 'Toyota', models: [{ id: 'm1', name: 'Camry', years: '2012-2024' }, { id: 'm2', name: 'RAV4', years: '2013-2024' }, { id: 'm3', name: 'Corolla', years: '2000-2024' }] },
@@ -99,6 +128,44 @@ export function loadDbExtras(): DbExtras {
       { id: 'dt3', name: 'Рахунок-фактура', type: 'invoice', content: 'Шаблон рахунку-фактури', createdAt: '2024-01-01' },
       { id: 'dt4', name: 'Договір на обслуговування', type: 'contract', content: 'Договір технічного обслуговування', createdAt: '2024-01-01' },
     ],
+    warehouseDocuments: [
+      {
+        id: 'wd1', number: 'ПРХ-0001', type: 'incoming', date: '2023-10-01',
+        supplierId: 's1', status: 'completed', createdAt: '2023-10-01',
+        notes: 'Планова закупівля мастил',
+        items: [
+          { id: 'wdi1', partId: '1', name: 'Мастило 5W30 4л', quantity: 10, price: 1200 },
+          { id: 'wdi2', partId: '4', name: 'Антифриз G12 5л', quantity: 5, price: 450 },
+        ],
+      },
+      {
+        id: 'wd2', number: 'РЗХ-0001', type: 'outgoing', date: '2023-10-10',
+        status: 'completed', createdAt: '2023-10-10',
+        notes: 'Списання за наряд WO-1001',
+        items: [
+          { id: 'wdi3', partId: '1', name: 'Мастило 5W30 4л', quantity: 1, price: 1800 },
+          { id: 'wdi4', partId: '2', name: 'Фільтр масляний', quantity: 1, price: 350 },
+        ],
+      },
+      {
+        id: 'wd3', number: 'ІНВ-0001', type: 'inventory', date: '2023-10-15',
+        status: 'completed', createdAt: '2023-10-15',
+        notes: 'Планова щомісячна інвентаризація',
+        items: [
+          { id: 'wdi5', partId: '1', name: 'Мастило 5W30 4л', quantity: 15, price: 1200 },
+          { id: 'wdi6', partId: '2', name: 'Фільтр масляний', quantity: 2, price: 150 },
+          { id: 'wdi7', partId: '3', name: 'Колодки гальмівні передні', quantity: 4, price: 800 },
+        ],
+      },
+      {
+        id: 'wd4', number: 'ПВР-0001', type: 'return', date: '2023-10-08',
+        supplierId: 's2', status: 'completed', createdAt: '2023-10-08',
+        notes: 'Повернення бракованого товару',
+        items: [
+          { id: 'wdi8', partId: '2', name: 'Фільтр масляний', quantity: 2, price: 150 },
+        ],
+      },
+    ],
   };
 }
 
@@ -107,7 +174,7 @@ export function saveDbExtras(db: DbExtras) {
 }
 
 // ─── Tab types ────────────────────────────────────────────────────────────────
-type DbTab = 'vehicles' | 'parts' | 'norms' | 'clients' | 'documents' | 'suppliers';
+type DbTab = 'vehicles' | 'parts' | 'norms' | 'clients' | 'documents' | 'suppliers' | 'warehouse';
 
 interface Props {
   data: AppData;
@@ -131,6 +198,7 @@ export default function Database({ data, updateData }: Props) {
     { id: 'clients', label: 'Клієнти', icon: <Users size={16} />, count: data.clients.length },
     { id: 'documents', label: 'Документи', icon: <FileText size={16} />, count: db.documentTemplates.length },
     { id: 'suppliers', label: 'Постачальники', icon: <Truck size={16} />, count: data.suppliers.length },
+    { id: 'warehouse', label: 'Складські документи', icon: <ClipboardList size={16} />, count: db.warehouseDocuments.length },
   ];
 
   return (
@@ -183,6 +251,7 @@ export default function Database({ data, updateData }: Props) {
       {activeTab === 'clients' && <ClientsDbTab data={data} search={search} updateData={updateData} />}
       {activeTab === 'documents' && <DocumentsTab db={db} saveDb={saveDb} search={search} data={data} />}
       {activeTab === 'suppliers' && <SuppliersTab data={data} updateData={updateData} search={search} />}
+      {activeTab === 'warehouse' && <WarehouseDocumentsTab db={db} saveDb={saveDb} search={search} data={data} updateData={updateData} />}
     </div>
   );
 }
@@ -1085,6 +1154,482 @@ function SuppliersTab({ data, updateData, search }: { data: AppData; updateData:
             <div className="p-5 border-t bg-neutral-50 flex gap-3 justify-end">
               <button onClick={() => setShowModal(false)} className="px-5 py-2 rounded-lg text-neutral-600 hover:bg-neutral-100">Скасувати</button>
               <button onClick={handleSave} className="bg-[#ffcc00] text-black px-5 py-2 rounded-lg font-bold flex items-center gap-2"><Save size={16} /> Зберегти</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Warehouse Documents Tab ──────────────────────────────────────────────────
+function WarehouseDocumentsTab({
+  db, saveDb, search, data, updateData,
+}: {
+  db: DbExtras;
+  saveDb: (d: DbExtras) => void;
+  search: string;
+  data: AppData;
+  updateData: (d: Partial<AppData>) => void;
+}) {
+  const [typeFilter, setTypeFilter] = useState<'all' | WarehouseDocument['type']>('all');
+  const [showModal, setShowModal] = useState(false);
+  const [editDoc, setEditDoc] = useState<WarehouseDocument | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [form, setForm] = useState<Partial<WarehouseDocument>>({});
+  const [itemForm, setItemForm] = useState<Partial<WarehouseDocumentItem>>({ name: '', quantity: 1, price: 0 });
+
+  const typeConfig: Record<WarehouseDocument['type'], { label: string; icon: React.ReactNode; color: string; badgeColor: string; number: string }> = {
+    incoming:  { label: 'Прихід',         icon: <ArrowDownCircle size={16} />, color: 'text-green-600',  badgeColor: 'bg-green-100 text-green-700',  number: 'ПРХ' },
+    outgoing:  { label: 'Розхід',         icon: <ArrowUpCircle   size={16} />, color: 'text-red-600',    badgeColor: 'bg-red-100 text-red-700',      number: 'РЗХ' },
+    inventory: { label: 'Інвентаризація', icon: <ClipboardList   size={16} />, color: 'text-blue-600',   badgeColor: 'bg-blue-100 text-blue-700',    number: 'ІНВ' },
+    return:    { label: 'Повернення',     icon: <RotateCcw       size={16} />, color: 'text-orange-600', badgeColor: 'bg-orange-100 text-orange-700', number: 'ПВР' },
+  };
+
+  const filtered = useMemo(() =>
+    db.warehouseDocuments.filter(d => {
+      const matchesSearch =
+        d.number.toLowerCase().includes(search.toLowerCase()) ||
+        (d.notes || '').toLowerCase().includes(search.toLowerCase()) ||
+        d.items.some(i => i.name.toLowerCase().includes(search.toLowerCase()));
+      const matchesType = typeFilter === 'all' || d.type === typeFilter;
+      return matchesSearch && matchesType;
+    }).sort((a, b) => b.date.localeCompare(a.date)),
+    [db.warehouseDocuments, search, typeFilter]
+  );
+
+  const generateDocNumber = (type: WarehouseDocument['type']) => {
+    const prefix = typeConfig[type].number;
+    const existing = db.warehouseDocuments.filter(d => d.type === type).length;
+    return `${prefix}-${String(existing + 1).padStart(4, '0')}`;
+  };
+
+  const openModal = (doc?: WarehouseDocument) => {
+    if (doc) {
+      setEditDoc(doc);
+      setForm({ ...doc });
+    } else {
+      setEditDoc(null);
+      setForm({
+        type: 'incoming',
+        date: new Date().toISOString().split('T')[0],
+        status: 'draft',
+        items: [],
+        notes: '',
+        supplierId: '',
+      });
+    }
+    setItemForm({ name: '', quantity: 1, price: 0 });
+    setShowModal(true);
+  };
+
+  const handleAddItem = () => {
+    if (!itemForm.name || !itemForm.quantity) return;
+    const newItem: WarehouseDocumentItem = {
+      id: generateId(),
+      partId: itemForm.partId,
+      name: itemForm.name!,
+      quantity: itemForm.quantity || 1,
+      price: itemForm.price || 0,
+    };
+    setForm(prev => ({ ...prev, items: [...(prev.items || []), newItem] }));
+    setItemForm({ name: '', quantity: 1, price: 0 });
+  };
+
+  const handleRemoveItem = (itemId: string) => {
+    setForm(prev => ({ ...prev, items: (prev.items || []).filter(i => i.id !== itemId) }));
+  };
+
+  const handlePartSelect = (partId: string) => {
+    const part = data.inventory.find((p: Part) => p.id === partId);
+    if (part) {
+      setItemForm(prev => ({
+        ...prev,
+        partId: part.id,
+        name: part.name,
+        price: (form.type === 'outgoing') ? part.salePrice : part.purchasePrice,
+      }));
+    }
+  };
+
+  const handleSave = () => {
+    if (!form.type || !(form.items || []).length) return;
+    const doc: WarehouseDocument = {
+      id: editDoc?.id || generateId(),
+      number: editDoc?.number || generateDocNumber(form.type!),
+      type: form.type!,
+      date: form.date || new Date().toISOString().split('T')[0],
+      supplierId: form.supplierId || undefined,
+      items: form.items || [],
+      notes: form.notes,
+      status: form.status || 'draft',
+      createdAt: editDoc?.createdAt || new Date().toISOString().split('T')[0],
+    };
+
+    // Update inventory stock when a document is completed for the first time
+    if (doc.status === 'completed' && editDoc?.status !== 'completed') {
+      const updatedInventory = [...data.inventory];
+      doc.items.forEach(item => {
+        if (!item.partId) return;
+        const idx = updatedInventory.findIndex(p => p.id === item.partId);
+        if (idx === -1) return;
+        if (doc.type === 'incoming') {
+          updatedInventory[idx] = { ...updatedInventory[idx], stock: updatedInventory[idx].stock + item.quantity };
+        } else if (doc.type === 'outgoing' || doc.type === 'return') {
+          updatedInventory[idx] = { ...updatedInventory[idx], stock: Math.max(0, updatedInventory[idx].stock - item.quantity) };
+        } else if (doc.type === 'inventory') {
+          updatedInventory[idx] = { ...updatedInventory[idx], stock: item.quantity };
+        }
+      });
+      updateData({ inventory: updatedInventory });
+    }
+
+    if (editDoc) {
+      saveDb({ ...db, warehouseDocuments: db.warehouseDocuments.map(d => d.id === editDoc.id ? doc : d) });
+    } else {
+      saveDb({ ...db, warehouseDocuments: [...db.warehouseDocuments, doc] });
+    }
+    setShowModal(false);
+  };
+
+  const handleDelete = (id: string) => {
+    if (!confirm('Видалити документ?')) return;
+    saveDb({ ...db, warehouseDocuments: db.warehouseDocuments.filter(d => d.id !== id) });
+  };
+
+  const totalItems = filtered.reduce((acc, d) => acc + d.items.reduce((a, i) => a + i.quantity, 0), 0);
+  const totalValue = filtered.reduce((acc, d) => acc + d.items.reduce((a, i) => a + i.quantity * i.price, 0), 0);
+
+  return (
+    <div className="space-y-4">
+      {/* Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {(Object.keys(typeConfig) as WarehouseDocument['type'][]).map(t => {
+          const cfg = typeConfig[t];
+          const count = db.warehouseDocuments.filter(d => d.type === t).length;
+          return (
+            <div key={t} className="bg-white rounded-xl border shadow-sm p-4 flex items-center gap-3">
+              <div className={`p-2 rounded-lg bg-neutral-100 ${cfg.color}`}>{cfg.icon}</div>
+              <div>
+                <p className="text-xs text-neutral-500">{cfg.label}</p>
+                <p className="text-xl font-bold">{count}</p>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Filters + Add */}
+      <div className="flex flex-wrap gap-3 items-center justify-between">
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => setTypeFilter('all')}
+            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${typeFilter === 'all' ? 'bg-neutral-900 text-white' : 'bg-neutral-100 hover:bg-neutral-200'}`}
+          >
+            Всі ({db.warehouseDocuments.length})
+          </button>
+          {(Object.keys(typeConfig) as WarehouseDocument['type'][]).map(t => (
+            <button
+              key={t}
+              onClick={() => setTypeFilter(t)}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium flex items-center gap-1.5 transition-colors ${typeFilter === t ? 'bg-[#ffcc00] text-black' : 'bg-neutral-100 hover:bg-neutral-200'}`}
+            >
+              {typeConfig[t].icon} {typeConfig[t].label}
+            </button>
+          ))}
+        </div>
+        <button
+          onClick={() => openModal()}
+          className="bg-[#ffcc00] text-black px-4 py-2 rounded-xl font-bold flex items-center gap-2"
+        >
+          <Plus size={18} /> Новий документ
+        </button>
+      </div>
+
+      {/* Summary */}
+      {filtered.length > 0 && (
+        <div className="flex gap-4 text-sm text-neutral-500">
+          <span>Документів: <strong className="text-neutral-800">{filtered.length}</strong></span>
+          <span>Позицій: <strong className="text-neutral-800">{totalItems}</strong></span>
+          <span>Сума: <strong className="text-neutral-800">{totalValue.toLocaleString()} ₴</strong></span>
+        </div>
+      )}
+
+      {/* Documents List */}
+      <div className="space-y-3">
+        {filtered.length === 0 && (
+          <div className="bg-white rounded-xl border shadow-sm p-10 text-center text-neutral-400">
+            <ClipboardList size={40} className="mx-auto mb-3 opacity-30" />
+            <p className="font-medium">Документи не знайдено</p>
+          </div>
+        )}
+        {filtered.map(doc => {
+          const cfg = typeConfig[doc.type];
+          const docTotal = doc.items.reduce((a, i) => a + i.quantity * i.price, 0);
+          const supplier = data.suppliers.find(s => s.id === doc.supplierId);
+          const isExpanded = expandedId === doc.id;
+          return (
+            <div key={doc.id} className="bg-white rounded-xl border shadow-sm overflow-hidden">
+              <div
+                className="p-4 flex items-center justify-between cursor-pointer hover:bg-neutral-50"
+                onClick={() => setExpandedId(isExpanded ? null : doc.id)}
+              >
+                <div className="flex items-center gap-4">
+                  <div className={`p-2.5 rounded-lg bg-neutral-100 ${cfg.color}`}>{cfg.icon}</div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold font-mono">{doc.number}</span>
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${cfg.badgeColor}`}>{cfg.label}</span>
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${doc.status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                        {doc.status === 'completed' ? 'Проведено' : 'Чернетка'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3 mt-0.5 text-xs text-neutral-500">
+                      <span>{doc.date}</span>
+                      {supplier && <span>• {supplier.name}</span>}
+                      {doc.notes && <span className="truncate max-w-xs">• {doc.notes}</span>}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-4">
+                  <div className="text-right hidden sm:block">
+                    <p className="font-bold text-neutral-800">{docTotal.toLocaleString()} ₴</p>
+                    <p className="text-xs text-neutral-400">{doc.items.length} позицій</p>
+                  </div>
+                  <div className="flex gap-1" onClick={e => e.stopPropagation()}>
+                    <button onClick={() => openModal(doc)} className="p-2 text-neutral-400 hover:text-blue-600 rounded-lg hover:bg-blue-50"><Edit2 size={14} /></button>
+                    <button onClick={() => handleDelete(doc.id)} className="p-2 text-neutral-400 hover:text-red-600 rounded-lg hover:bg-red-50"><Trash2 size={14} /></button>
+                  </div>
+                  {isExpanded ? <ChevronUp size={16} className="text-neutral-400" /> : <ChevronDown size={16} className="text-neutral-400" />}
+                </div>
+              </div>
+
+              {isExpanded && (
+                <div className="border-t bg-neutral-50">
+                  <table className="w-full text-sm">
+                    <thead className="bg-neutral-100 text-[10px] uppercase font-bold text-neutral-500">
+                      <tr>
+                        <th className="px-4 py-2 text-left">Назва товару</th>
+                        <th className="px-4 py-2 text-center">Кількість</th>
+                        <th className="px-4 py-2 text-right">Ціна</th>
+                        <th className="px-4 py-2 text-right">Сума</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-neutral-100">
+                      {doc.items.map(item => (
+                        <tr key={item.id} className="bg-white">
+                          <td className="px-4 py-2.5 font-medium">{item.name}</td>
+                          <td className="px-4 py-2.5 text-center">{item.quantity} шт</td>
+                          <td className="px-4 py-2.5 text-right text-neutral-500">{item.price.toLocaleString()} ₴</td>
+                          <td className="px-4 py-2.5 text-right font-bold">{(item.quantity * item.price).toLocaleString()} ₴</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot className="bg-neutral-100 font-bold">
+                      <tr>
+                        <td colSpan={3} className="px-4 py-2 text-right text-neutral-600 text-xs">Підсумок:</td>
+                        <td className="px-4 py-2 text-right">{docTotal.toLocaleString()} ₴</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Modal */}
+      {showModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="p-5 border-b bg-neutral-50 flex justify-between items-center shrink-0">
+              <h3 className="font-bold text-lg flex items-center gap-2">
+                <ClipboardList className="text-[#ffcc00]" size={20} />
+                {editDoc ? `Редагувати ${editDoc.number}` : 'Новий складський документ'}
+              </h3>
+              <button onClick={() => setShowModal(false)}><X size={20} className="text-neutral-400" /></button>
+            </div>
+
+            <div className="p-5 space-y-4 overflow-y-auto">
+              {/* Type + Date + Status */}
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-neutral-600 mb-1">Тип документа</label>
+                  <select
+                    value={form.type || 'incoming'}
+                    onChange={e => setForm({ ...form, type: e.target.value as WarehouseDocument['type'] })}
+                    className="w-full p-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#ffcc00]"
+                    disabled={!!editDoc}
+                  >
+                    {(Object.keys(typeConfig) as WarehouseDocument['type'][]).map(t => (
+                      <option key={t} value={t}>{typeConfig[t].label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-neutral-600 mb-1">Дата</label>
+                  <input
+                    type="date"
+                    value={form.date || ''}
+                    onChange={e => setForm({ ...form, date: e.target.value })}
+                    className="w-full p-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#ffcc00]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-neutral-600 mb-1">Статус</label>
+                  <select
+                    value={form.status || 'draft'}
+                    onChange={e => setForm({ ...form, status: e.target.value as WarehouseDocument['status'] })}
+                    className="w-full p-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#ffcc00]"
+                  >
+                    <option value="draft">Чернетка</option>
+                    <option value="completed">Провести</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Supplier (for incoming/return) */}
+              {(form.type === 'incoming' || form.type === 'return') && (
+                <div>
+                  <label className="block text-xs font-bold text-neutral-600 mb-1">Постачальник</label>
+                  <select
+                    value={form.supplierId || ''}
+                    onChange={e => setForm({ ...form, supplierId: e.target.value })}
+                    className="w-full p-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#ffcc00]"
+                  >
+                    <option value="">— Оберіть постачальника —</option>
+                    {data.suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </select>
+                </div>
+              )}
+
+              {/* Notes */}
+              <div>
+                <label className="block text-xs font-bold text-neutral-600 mb-1">Примітки</label>
+                <input
+                  type="text"
+                  value={form.notes || ''}
+                  onChange={e => setForm({ ...form, notes: e.target.value })}
+                  className="w-full p-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#ffcc00]"
+                  placeholder="Додаткові примітки..."
+                />
+              </div>
+
+              {/* Items */}
+              <div>
+                <label className="block text-xs font-bold text-neutral-600 mb-2">Позиції документа</label>
+
+                {/* Add item row */}
+                <div className="grid grid-cols-12 gap-2 mb-3">
+                  <div className="col-span-5">
+                    <select
+                      value={itemForm.partId || ''}
+                      onChange={e => e.target.value ? handlePartSelect(e.target.value) : setItemForm({ ...itemForm, partId: '', name: '' })}
+                      className="w-full p-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#ffcc00] text-sm"
+                    >
+                      <option value="">Зі складу або вручну</option>
+                      {data.inventory.map((p: Part) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                    </select>
+                  </div>
+                  <div className="col-span-3">
+                    <input
+                      type="text"
+                      value={itemForm.name || ''}
+                      onChange={e => setItemForm({ ...itemForm, name: e.target.value })}
+                      placeholder="Назва"
+                      className="w-full p-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#ffcc00] text-sm"
+                    />
+                  </div>
+                  <div className="col-span-1">
+                    <input
+                      type="number"
+                      value={itemForm.quantity || ''}
+                      onChange={e => setItemForm({ ...itemForm, quantity: Number(e.target.value) })}
+                      placeholder="К-сть"
+                      min={1}
+                      className="w-full p-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#ffcc00] text-sm"
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <input
+                      type="number"
+                      value={itemForm.price || ''}
+                      onChange={e => setItemForm({ ...itemForm, price: Number(e.target.value) })}
+                      placeholder="Ціна"
+                      min={0}
+                      className="w-full p-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#ffcc00] text-sm"
+                    />
+                  </div>
+                  <div className="col-span-1">
+                    <button
+                      onClick={handleAddItem}
+                      className="w-full h-full bg-[#ffcc00] rounded-lg flex items-center justify-center font-bold"
+                      title="Додати позицію"
+                    >
+                      <Plus size={16} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Items table */}
+                {(form.items || []).length > 0 ? (
+                  <div className="border rounded-lg overflow-hidden">
+                    <table className="w-full text-sm">
+                      <thead className="bg-neutral-50 text-[10px] uppercase font-bold text-neutral-500">
+                        <tr>
+                          <th className="px-3 py-2 text-left">Назва</th>
+                          <th className="px-3 py-2 text-center">К-сть</th>
+                          <th className="px-3 py-2 text-right">Ціна</th>
+                          <th className="px-3 py-2 text-right">Сума</th>
+                          <th className="px-3 py-2"></th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {(form.items || []).map(item => (
+                          <tr key={item.id} className="hover:bg-neutral-50">
+                            <td className="px-3 py-2 font-medium">{item.name}</td>
+                            <td className="px-3 py-2 text-center">{item.quantity}</td>
+                            <td className="px-3 py-2 text-right text-neutral-500">{item.price.toLocaleString()} ₴</td>
+                            <td className="px-3 py-2 text-right font-bold">{(item.quantity * item.price).toLocaleString()} ₴</td>
+                            <td className="px-3 py-2 text-right">
+                              <button onClick={() => handleRemoveItem(item.id)} className="text-neutral-300 hover:text-red-500">
+                                <Trash2 size={12} />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot className="bg-neutral-50 font-bold border-t">
+                        <tr>
+                          <td colSpan={3} className="px-3 py-2 text-right text-xs text-neutral-500">Підсумок:</td>
+                          <td className="px-3 py-2 text-right">
+                            {(form.items || []).reduce((a, i) => a + i.quantity * i.price, 0).toLocaleString()} ₴
+                          </td>
+                          <td></td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="border rounded-lg p-6 text-center text-neutral-400 text-sm bg-neutral-50">
+                    Додайте позиції до документа
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="p-5 border-t bg-neutral-50 flex gap-3 justify-end shrink-0">
+              <button onClick={() => setShowModal(false)} className="px-5 py-2 rounded-lg text-neutral-600 hover:bg-neutral-100">
+                Скасувати
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={!(form.items || []).length}
+                className="bg-[#ffcc00] text-black px-5 py-2 rounded-lg font-bold flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Save size={16} /> Зберегти
+              </button>
             </div>
           </div>
         </div>
