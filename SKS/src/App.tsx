@@ -40,10 +40,13 @@ import Login from './pages/Login';
 import WarehouseDocuments from './pages/WarehouseDocuments';
 import { sendTelegramNotification } from './pages/Telegram';
 
+const MOBILE_BREAKPOINT = 768;
+
 export function App() {
   const [data, setData] = useState<AppData>(loadData());
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < MOBILE_BREAKPOINT);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(() => window.innerWidth >= MOBILE_BREAKPOINT);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
 
@@ -75,6 +78,21 @@ export function App() {
   useEffect(() => {
     saveData(data);
   }, [data]);
+
+  // ── Mobile detection ─────────────────────────────────────────────────────────
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>;
+    const handleResize = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        const mobile = window.innerWidth < MOBILE_BREAKPOINT;
+        setIsMobile(mobile);
+        setIsSidebarOpen(!mobile);
+      }, 100);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => { window.removeEventListener('resize', handleResize); clearTimeout(timer); };
+  }, []);
 
   const updateData = (newData: Partial<AppData>) => {
     setData(prev => ({ ...prev, ...newData }));
@@ -234,8 +252,20 @@ export function App() {
 
   return (
     <div className="flex h-screen bg-neutral-50 text-neutral-900 font-sans overflow-hidden">
+      {/* ── Mobile sidebar backdrop ──────────────────────────────────────────── */}
+      {isMobile && isSidebarOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/50"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
       {/* ── Sidebar ─────────────────────────────────────────────────────────── */}
-      <aside className={`bg-neutral-900 text-white transition-all duration-300 flex flex-col shrink-0 ${isSidebarOpen ? 'w-64' : 'w-16'}`}>
+      <aside className={`bg-neutral-900 text-white flex flex-col shrink-0 ${
+        isMobile
+          ? `fixed inset-y-0 left-0 z-50 w-64 transition-transform duration-300 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`
+          : `transition-all duration-300 ${isSidebarOpen ? 'w-64' : 'w-16'}`
+      }`}>
         {/* Logo */}
         <div className={`p-4 flex items-center gap-3 border-b border-neutral-800 shrink-0 ${!isSidebarOpen ? 'justify-center' : ''}`}>
           <div className="w-9 h-9 bg-[#ffcc00] rounded-lg flex items-center justify-center shrink-0">
@@ -261,7 +291,7 @@ export function App() {
                 {group.items.map(item => (
                   <button
                     key={item.id}
-                    onClick={() => setActiveTab(item.id)}
+                    onClick={() => { setActiveTab(item.id); if (isMobile) setIsSidebarOpen(false); }}
                     title={!isSidebarOpen ? item.label : undefined}
                     className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all text-sm ${
                       activeTab === item.id
@@ -292,9 +322,19 @@ export function App() {
       <main className="flex-1 flex flex-col overflow-hidden min-w-0">
         {/* Header */}
         <header className="h-14 bg-white border-b flex items-center justify-between px-5 shrink-0 shadow-sm">
-          <h2 className="text-base font-bold text-neutral-800 truncate">
-            {allNavItems.find(i => i.id === activeTab)?.label || 'Панель'}
-          </h2>
+          {/* Mobile hamburger button */}
+          <div className="flex items-center gap-3 min-w-0">
+            <button
+              className="md:hidden p-2 text-neutral-500 hover:bg-neutral-100 rounded-lg transition-colors shrink-0"
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+              title="Меню"
+            >
+              <Menu size={20} />
+            </button>
+            <h2 className="text-base font-bold text-neutral-800 truncate">
+              {allNavItems.find(i => i.id === activeTab)?.label || 'Панель'}
+            </h2>
+          </div>
 
           <div className="flex items-center gap-3">
             {/* Notifications bell */}
