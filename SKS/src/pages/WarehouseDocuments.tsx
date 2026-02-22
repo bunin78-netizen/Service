@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { AppData, WarehouseDocument, WarehouseDocumentItem } from '../types';
-import { Plus, FileText, X, Save, Trash2, ChevronDown, ChevronUp, Printer } from 'lucide-react';
+import { Plus, FileText, X, Save, Trash2, ChevronDown, ChevronUp, Printer, RefreshCw } from 'lucide-react';
 import { generateId } from '../store';
 
 function applyDocumentToInventory(
@@ -33,6 +33,26 @@ function checkStock(
     }
   }
   return null;
+}
+
+function syncInventoryFromDocuments(
+  documents: WarehouseDocument[],
+  inventory: AppData['inventory'],
+): AppData['inventory'] {
+  const sorted = [...documents].sort((a, b) => {
+    const d = a.date.localeCompare(b.date);
+    if (d !== 0) return d;
+    return (a.createdAt || '').localeCompare(b.createdAt || '');
+  });
+  // Reset to 0 then replay completed documents.
+  // Documents without a status field are treated as 'completed' for backward compatibility.
+  const zeroed = inventory.map(p => ({ ...p, stock: 0 }));
+  return sorted
+    .filter(doc => !doc.status || doc.status === 'completed')
+    .reduce(
+      (inv, doc) => applyDocumentToInventory(doc.type, doc.items, inv, 1),
+      zeroed,
+    );
 }
 
 const DOC_TYPE_LABELS: Record<WarehouseDocument['type'], string> = {
@@ -148,6 +168,12 @@ export default function WarehouseDocuments({
     setForm(prev => ({ ...prev, items: prev.items.filter((_, i) => i !== idx) }));
   };
 
+  const handleSync = () => {
+    if (!confirm('Синхронізувати залишки складу за документами? Поточні залишки буде перераховано.')) return;
+    const newInventory = syncInventoryFromDocuments(docs, data.inventory);
+    updateData({ inventory: newInventory });
+  };
+
   const docTotal = (doc: WarehouseDocument) =>
     doc.items.reduce((sum, it) => sum + it.quantity * it.price, 0);
 
@@ -233,12 +259,21 @@ export default function WarehouseDocuments({
       <div className="bg-white rounded-2xl shadow-sm border overflow-hidden">
         <div className="p-4 border-b flex items-center justify-between bg-neutral-50/50">
           <h3 className="font-bold text-base">Складські документи</h3>
-          <button
-            onClick={openNew}
-            className="bg-[#ffcc00] text-black px-4 py-2 rounded-xl font-bold flex items-center gap-2 hover:bg-[#e6b800] transition-colors shadow-sm text-sm"
-          >
-            <Plus size={18} /> Новий документ
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={handleSync}
+              className="bg-neutral-100 text-neutral-700 px-4 py-2 rounded-xl font-bold flex items-center gap-2 hover:bg-neutral-200 transition-colors shadow-sm text-sm"
+              title="Перерахувати залишки складу за документами"
+            >
+              <RefreshCw size={18} /> Синхронізувати
+            </button>
+            <button
+              onClick={openNew}
+              className="bg-[#ffcc00] text-black px-4 py-2 rounded-xl font-bold flex items-center gap-2 hover:bg-[#e6b800] transition-colors shadow-sm text-sm"
+            >
+              <Plus size={18} /> Новий документ
+            </button>
+          </div>
         </div>
 
         {docs.length === 0 ? (
