@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { AppData, WarehouseDocument, WarehouseDocumentItem } from '../types';
-import { Plus, FileText, X, Save, Trash2, ChevronDown, ChevronUp, Printer, RefreshCw } from 'lucide-react';
+import { Plus, FileText, X, Save, Trash2, ChevronDown, ChevronUp, Printer, RefreshCw, Search } from 'lucide-react';
 import { generateId } from '../store';
 
 function applyDocumentToInventory(
@@ -92,6 +92,8 @@ export default function WarehouseDocuments({
   const [editingDoc, setEditingDoc] = useState<WarehouseDocument | null>(null);
   const [form, setForm] = useState<Omit<WarehouseDocument, 'id'>>(EMPTY_FORM);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [typeFilter, setTypeFilter] = useState<WarehouseDocument['type'] | 'all'>('all');
 
   const docs = data.warehouseDocuments || [];
 
@@ -241,6 +243,13 @@ export default function WarehouseDocuments({
     w.print();
   };
 
+  const filteredDocs = docs.filter(doc => {
+    const matchesType = typeFilter === 'all' || doc.type === typeFilter;
+    const term = searchTerm.toLowerCase();
+    const matchesSearch = !term || doc.number.toLowerCase().includes(term) || (doc.note || '').toLowerCase().includes(term);
+    return matchesType && matchesSearch;
+  });
+
   return (
     <div className="space-y-6">
       {/* Summary cards */}
@@ -257,9 +266,35 @@ export default function WarehouseDocuments({
 
       {/* Table */}
       <div className="bg-white rounded-2xl shadow-sm border overflow-hidden">
-        <div className="p-4 border-b flex items-center justify-between bg-neutral-50/50">
-          <h3 className="font-bold text-base">Складські документи</h3>
-          <div className="flex gap-2">
+        <div className="p-4 border-b flex flex-wrap gap-4 items-center justify-between bg-neutral-50/50">
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setTypeFilter('all')}
+              className={`px-4 py-2 rounded-xl text-sm font-bold transition-colors ${typeFilter === 'all' ? 'bg-neutral-900 text-white' : 'bg-white border hover:bg-neutral-100'}`}
+            >
+              Всі
+            </button>
+            {(Object.keys(DOC_TYPE_LABELS) as WarehouseDocument['type'][]).map(t => (
+              <button
+                key={t}
+                onClick={() => setTypeFilter(t)}
+                className={`px-4 py-2 rounded-xl text-sm font-bold transition-colors ${typeFilter === t ? 'bg-neutral-900 text-white' : 'bg-white border hover:bg-neutral-100'}`}
+              >
+                {DOC_TYPE_LABELS[t]}
+              </button>
+            ))}
+          </div>
+          <div className="flex gap-2 items-center">
+            <div className="relative">
+              <Search className="absolute left-3 top-2.5 text-neutral-400" size={18} />
+              <input
+                type="text"
+                placeholder="Пошук за номером або нотаткою..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10 pr-4 py-2 border rounded-xl focus:ring-2 focus:ring-[#ffcc00] outline-none text-sm w-52"
+              />
+            </div>
             <button
               onClick={handleSync}
               className="bg-neutral-100 text-neutral-700 px-4 py-2 rounded-xl font-bold flex items-center gap-2 hover:bg-neutral-200 transition-colors shadow-sm text-sm"
@@ -281,9 +316,14 @@ export default function WarehouseDocuments({
             <FileText size={40} className="mx-auto mb-3 opacity-30" />
             <p>Немає складських документів</p>
           </div>
+        ) : filteredDocs.length === 0 ? (
+          <div className="p-12 text-center text-neutral-400">
+            <Search size={40} className="mx-auto mb-3 opacity-30" />
+            <p>Нічого не знайдено</p>
+          </div>
         ) : (
           <div className="divide-y">
-            {docs.map(doc => (
+            {filteredDocs.map(doc => (
               <div key={doc.id}>
                 <div
                   className="flex items-center gap-4 px-6 py-4 hover:bg-neutral-50 cursor-pointer transition-colors"
