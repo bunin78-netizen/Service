@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { AppData, WarehouseDocument, WarehouseDocumentItem } from '../types';
-import { Plus, FileText, X, Save, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus, FileText, X, Save, Trash2, ChevronDown, ChevronUp, Printer } from 'lucide-react';
 import { generateId } from '../store';
 
 function applyDocumentToInventory(
@@ -151,6 +151,70 @@ export default function WarehouseDocuments({
   const docTotal = (doc: WarehouseDocument) =>
     doc.items.reduce((sum, it) => sum + it.quantity * it.price, 0);
 
+  const escHtml = (s: string) =>
+    s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+  const handlePrint = (doc: WarehouseDocument) => {
+    const cs = data.companySettings;
+    const supplier = data.suppliers.find(s => s.id === doc.supplierId);
+    const client = data.clients.find(c => c.id === doc.clientId);
+    const total = docTotal(doc);
+    const w = window.open('', '_blank');
+    if (!w) { alert('Дозвольте спливаючі вікна у браузері для друку документа.'); return; }
+    w.document.write(`<html><head><title>${escHtml(DOC_TYPE_LABELS[doc.type])} № ${escHtml(doc.number)}</title>
+    <style>
+      body{font-family:Arial,sans-serif;padding:40px;color:#333;max-width:800px;margin:0 auto}
+      .header{display:flex;justify-content:space-between;border-bottom:3px solid #ffcc00;padding-bottom:20px;margin-bottom:20px}
+      .company{font-size:22px;font-weight:bold}
+      .info{font-size:11px;color:#666}
+      .title{text-align:center;font-size:18px;font-weight:bold;text-transform:uppercase;margin:20px 0}
+      .meta{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:20px;font-size:13px;background:#f9f9f9;padding:15px;border-radius:8px}
+      table{width:100%;border-collapse:collapse;margin-bottom:20px}
+      th,td{border:1px solid #ddd;padding:8px;font-size:12px;text-align:left}
+      th{background:#f5f5f5;font-weight:bold}
+      .total{font-weight:bold;background:#fffbe6}
+      .footer{margin-top:50px;display:flex;justify-content:space-between}
+      .sig{width:200px;border-top:1px solid #000;text-align:center;font-size:11px;padding-top:5px}
+      @media print{body{padding:20px}}
+    </style></head><body>
+    <div class="header">
+      <div>
+        <div class="company">${escHtml(cs.name)}</div>
+        <div class="info">${escHtml(cs.address)}<br>Тел: ${escHtml(cs.phone)}<br>ЄДРПОУ: ${escHtml(cs.edrpou)}</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-weight:bold">${escHtml(DOC_TYPE_LABELS[doc.type]).toUpperCase()} № ${escHtml(doc.number)}</div>
+        <div style="font-size:13px">від ${escHtml(doc.date.split('-').reverse().join('.'))}</div>
+      </div>
+    </div>
+    <div class="title">${escHtml(DOC_TYPE_LABELS[doc.type])}</div>
+    <div class="meta">
+      <div><strong>Номер документа:</strong> ${escHtml(doc.number)}</div>
+      <div><strong>Дата:</strong> ${escHtml(doc.date.split('-').reverse().join('.'))}</div>
+      ${doc.type === 'incoming' && supplier ? `<div><strong>Постачальник:</strong> ${escHtml(supplier.name)}</div><div><strong>Тел. постачальника:</strong> ${escHtml(supplier.phone || '—')}</div>` : ''}
+      ${doc.type === 'outgoing' && client ? `<div><strong>Клієнт:</strong> ${escHtml(client.name)}</div><div><strong>Тел. клієнта:</strong> ${escHtml(client.phone || '—')}</div>` : ''}
+      ${doc.note ? `<div style="grid-column:span 2"><strong>Примітка:</strong> ${escHtml(doc.note)}</div>` : ''}
+    </div>
+    <table>
+      <thead><tr><th>#</th><th>Найменування</th><th>К-сть, шт</th><th>Ціна, ₴</th><th>Сума, ₴</th></tr></thead>
+      <tbody>
+        ${doc.items.map((item, i) => {
+          const part = data.inventory.find(p => p.id === item.partId);
+          const name = escHtml(part?.name || item.name || '—');
+          return `<tr><td>${i + 1}</td><td>${name}</td><td>${item.quantity}</td><td>${item.price.toFixed(2)}</td><td>${(item.quantity * item.price).toFixed(2)}</td></tr>`;
+        }).join('')}
+        <tr class="total"><td colspan="4" style="text-align:right">ВСЬОГО:</td><td>${total.toFixed(2)} ₴</td></tr>
+      </tbody>
+    </table>
+    <div class="footer">
+      <div class="sig">Склав(ла)<br>(${escHtml(cs.managerName || cs.name)})</div>
+      <div class="sig">Прийняв(ла)<br>&nbsp;</div>
+    </div>
+    </body></html>`);
+    w.document.close();
+    w.print();
+  };
+
   return (
     <div className="space-y-6">
       {/* Summary cards */}
@@ -211,6 +275,13 @@ export default function WarehouseDocuments({
                     {docTotal(doc).toLocaleString()} ₴
                   </span>
                   <div className="flex gap-1 ml-2" onClick={e => e.stopPropagation()}>
+                    <button
+                      onClick={() => handlePrint(doc)}
+                      className="p-1.5 text-neutral-400 hover:text-green-600 rounded-lg hover:bg-green-50"
+                      title="Друк"
+                    >
+                      <Printer size={15} />
+                    </button>
                     <button
                       onClick={() => openEdit(doc)}
                       className="p-1.5 text-neutral-400 hover:text-blue-600 rounded-lg hover:bg-blue-50"
