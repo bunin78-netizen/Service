@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Send, Bot, Settings, Bell, CheckCircle, AlertCircle, MessageCircle, Users, Package, CreditCard, FileText, Loader } from 'lucide-react';
 import { AppData, TelegramSettings } from '../types';
 
@@ -23,11 +23,38 @@ export default function Telegram({ data, onSave }: Props) {
   const [testMessage, setTestMessage] = useState('');
   const [saved, setSaved] = useState(false);
 
+  // Keep refs to latest values so the cleanup function can access them
+  const settingsRef = useRef(settings);
+  const dataRef = useRef(data);
+  const onSaveRef = useRef(onSave);
+  const isDirtyRef = useRef(false);
+
+  useEffect(() => {
+    settingsRef.current = settings;
+    dataRef.current = data;
+    onSaveRef.current = onSave;
+  }, [settings, data, onSave]);
+
+  // Auto-save settings when navigating away from this page
+  useEffect(() => {
+    return () => {
+      if (isDirtyRef.current) {
+        onSaveRef.current({ ...dataRef.current, telegramSettings: settingsRef.current });
+      }
+    };
+  }, []);
+
+  const updateSettings = (updated: TelegramSettings) => {
+    isDirtyRef.current = true;
+    setSettings(updated);
+  };
+
   const handleSave = () => {
     onSave({
       ...data,
       telegramSettings: settings,
     });
+    isDirtyRef.current = false;
     setSaved(true);
     setTimeout(() => setSaved(false), 3000);
   };
@@ -106,7 +133,7 @@ export default function Telegram({ data, onSave }: Props) {
                 <input
                   type="checkbox"
                   checked={settings.enabled}
-                  onChange={(e) => setSettings({ ...settings, enabled: e.target.checked })}
+                  onChange={(e) => updateSettings({ ...settings, enabled: e.target.checked })}
                   className="sr-only peer"
                 />
                 <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-yellow-500"></div>
@@ -120,7 +147,7 @@ export default function Telegram({ data, onSave }: Props) {
               <input
                 type="text"
                 value={settings.botToken}
-                onChange={(e) => setSettings({ ...settings, botToken: e.target.value })}
+                onChange={(e) => updateSettings({ ...settings, botToken: e.target.value })}
                 placeholder="123456789:ABCdefGHIjklMNOpqrsTUVwxyz"
                 className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500"
               />
@@ -134,7 +161,7 @@ export default function Telegram({ data, onSave }: Props) {
               <input
                 type="text"
                 value={settings.chatId}
-                onChange={(e) => setSettings({ ...settings, chatId: e.target.value })}
+                onChange={(e) => updateSettings({ ...settings, chatId: e.target.value })}
                 placeholder="-1001234567890"
                 className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500"
               />
@@ -147,7 +174,7 @@ export default function Telegram({ data, onSave }: Props) {
               </label>
               <textarea
                 value={settings.welcomeMessage}
-                onChange={(e) => setSettings({ ...settings, welcomeMessage: e.target.value })}
+                onChange={(e) => updateSettings({ ...settings, welcomeMessage: e.target.value })}
                 rows={3}
                 className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500"
                 placeholder="Вітаємо! Чим можемо допомогти?"
@@ -209,7 +236,7 @@ export default function Telegram({ data, onSave }: Props) {
               <input
                 type="checkbox"
                 checked={settings.notifyNewOrder}
-                onChange={(e) => setSettings({ ...settings, notifyNewOrder: e.target.checked })}
+                onChange={(e) => updateSettings({ ...settings, notifyNewOrder: e.target.checked })}
                 className="w-5 h-5 text-yellow-500 rounded focus:ring-yellow-500"
               />
             </label>
@@ -225,7 +252,7 @@ export default function Telegram({ data, onSave }: Props) {
               <input
                 type="checkbox"
                 checked={settings.notifyOrderCompleted}
-                onChange={(e) => setSettings({ ...settings, notifyOrderCompleted: e.target.checked })}
+                onChange={(e) => updateSettings({ ...settings, notifyOrderCompleted: e.target.checked })}
                 className="w-5 h-5 text-yellow-500 rounded focus:ring-yellow-500"
               />
             </label>
@@ -241,7 +268,7 @@ export default function Telegram({ data, onSave }: Props) {
               <input
                 type="checkbox"
                 checked={settings.notifyLowStock}
-                onChange={(e) => setSettings({ ...settings, notifyLowStock: e.target.checked })}
+                onChange={(e) => updateSettings({ ...settings, notifyLowStock: e.target.checked })}
                 className="w-5 h-5 text-yellow-500 rounded focus:ring-yellow-500"
               />
             </label>
@@ -257,7 +284,7 @@ export default function Telegram({ data, onSave }: Props) {
               <input
                 type="checkbox"
                 checked={settings.notifyPaymentReceived}
-                onChange={(e) => setSettings({ ...settings, notifyPaymentReceived: e.target.checked })}
+                onChange={(e) => updateSettings({ ...settings, notifyPaymentReceived: e.target.checked })}
                 className="w-5 h-5 text-yellow-500 rounded focus:ring-yellow-500"
               />
             </label>
@@ -273,7 +300,7 @@ export default function Telegram({ data, onSave }: Props) {
               <input
                 type="checkbox"
                 checked={settings.notifyNewClient}
-                onChange={(e) => setSettings({ ...settings, notifyNewClient: e.target.checked })}
+                onChange={(e) => updateSettings({ ...settings, notifyNewClient: e.target.checked })}
                 className="w-5 h-5 text-yellow-500 rounded focus:ring-yellow-500"
               />
             </label>
