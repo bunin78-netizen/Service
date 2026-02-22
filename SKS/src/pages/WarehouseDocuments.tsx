@@ -56,8 +56,8 @@ function syncInventoryFromDocuments(
 }
 
 const DOC_TYPE_LABELS: Record<WarehouseDocument['type'], string> = {
-  incoming: 'Прихід',
-  outgoing: 'Видаток',
+  incoming: 'Прихідна накладна',
+  outgoing: 'Видаткова накладна',
   writeoff: 'Списання',
   inventory: 'Інвентаризація',
   return: 'Повернення',
