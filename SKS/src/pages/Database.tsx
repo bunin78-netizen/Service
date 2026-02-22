@@ -1120,8 +1120,8 @@ function WarehouseDocumentsTab({
   const warehouseDocs = data.warehouseDocuments || [];
 
   const typeConfig: Record<WarehouseDocument['type'], { label: string; icon: React.ReactNode; color: string; badgeColor: string; number: string }> = {
-    incoming:  { label: 'Прихід',         icon: <ArrowDownCircle size={16} />, color: 'text-green-600',  badgeColor: 'bg-green-100 text-green-700',  number: 'ПРХ' },
-    outgoing:  { label: 'Розхід',         icon: <ArrowUpCircle   size={16} />, color: 'text-red-600',    badgeColor: 'bg-red-100 text-red-700',      number: 'РЗХ' },
+    incoming:  { label: 'Прихідна накладна', icon: <ArrowDownCircle size={16} />, color: 'text-green-600',  badgeColor: 'bg-green-100 text-green-700',  number: 'ПРХ' },
+    outgoing:  { label: 'Видаткова накладна', icon: <ArrowUpCircle   size={16} />, color: 'text-red-600',    badgeColor: 'bg-red-100 text-red-700',      number: 'РЗХ' },
     writeoff:  { label: 'Списання',       icon: <Trash2          size={16} />, color: 'text-yellow-600', badgeColor: 'bg-yellow-100 text-yellow-700', number: 'СП' },
     inventory: { label: 'Інвентаризація', icon: <ClipboardList   size={16} />, color: 'text-blue-600',   badgeColor: 'bg-blue-100 text-blue-700',    number: 'ІНВ' },
     return:    { label: 'Повернення',     icon: <RotateCcw       size={16} />, color: 'text-orange-600', badgeColor: 'bg-orange-100 text-orange-700', number: 'ПВР' },
