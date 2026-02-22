@@ -1,8 +1,8 @@
 import { useState, useMemo } from 'react';
-import { AppData, Supplier, Part, WarehouseDocument, WarehouseDocumentItem } from '../types';
+import { AppData, Employee, Supplier, Part, WarehouseDocument, WarehouseDocumentItem } from '../types';
 import { generateId } from '../store';
 import {
-  Car, Package, Wrench, Users, FileText, Truck,
+  Car, Package, Wrench, Users, FileText, Truck, UserCog,
   Plus, Search, Edit2, Trash2, X, Save, ChevronDown, ChevronUp,
   Clock, DollarSign, Phone, Mail, Globe, Hash,
   ArrowDownCircle, ArrowUpCircle, ClipboardList, RotateCcw,
@@ -114,7 +114,7 @@ export function saveDbExtras(db: DbExtras) {
 }
 
 // ─── Tab types ────────────────────────────────────────────────────────────────
-type DbTab = 'vehicles' | 'parts' | 'norms' | 'clients' | 'documents' | 'suppliers' | 'warehouse';
+type DbTab = 'vehicles' | 'parts' | 'norms' | 'clients' | 'documents' | 'suppliers' | 'warehouse' | 'employees';
 
 interface Props {
   data: AppData;
@@ -139,6 +139,7 @@ export default function Database({ data, updateData }: Props) {
     { id: 'documents', label: 'Документи', icon: <FileText size={16} />, count: db.documentTemplates.length },
     { id: 'suppliers', label: 'Постачальники', icon: <Truck size={16} />, count: data.suppliers.length },
     { id: 'warehouse', label: 'Складські документи', icon: <ClipboardList size={16} />, count: data.warehouseDocuments.length },
+    { id: 'employees', label: 'Співробітники', icon: <UserCog size={16} />, count: data.employees.length },
   ];
 
   return (
@@ -192,6 +193,7 @@ export default function Database({ data, updateData }: Props) {
       {activeTab === 'documents' && <DocumentsTab db={db} saveDb={saveDb} search={search} data={data} />}
       {activeTab === 'suppliers' && <SuppliersTab data={data} updateData={updateData} search={search} />}
       {activeTab === 'warehouse' && <WarehouseDocumentsTab search={search} data={data} updateData={updateData} />}
+      {activeTab === 'employees' && <EmployeesTab data={data} updateData={updateData} search={search} />}
     </div>
   );
 }
@@ -1575,6 +1577,246 @@ function WarehouseDocumentsTab({
                 disabled={!(form.items || []).length}
                 className="bg-[#ffcc00] text-black px-5 py-2 rounded-lg font-bold flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
+                <Save size={16} /> Зберегти
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Employees Tab ────────────────────────────────────────────────────────────
+function EmployeesTab({ data, updateData, search }: { data: AppData; updateData: (d: Partial<AppData>) => void; search: string }) {
+  const [showModal, setShowModal] = useState(false);
+  const [editEmployee, setEditEmployee] = useState<Employee | null>(null);
+  const [form, setForm] = useState<Partial<Employee>>({});
+
+  const roleLabels: Record<Employee['role'], string> = {
+    Master: 'Майстер',
+    Manager: 'Менеджер',
+  };
+
+  const roleColors: Record<Employee['role'], string> = {
+    Master: 'bg-green-100 text-green-700',
+    Manager: 'bg-blue-100 text-blue-700',
+  };
+
+  const searchLower = search.toLowerCase();
+
+  const filtered = useMemo(() =>
+    data.employees.filter(e =>
+      e.name.toLowerCase().includes(searchLower) ||
+      roleLabels[e.role].toLowerCase().includes(searchLower)
+    ), [data.employees, searchLower]);
+
+  const employeeStats = useMemo(() => {
+    const stats: Record<string, { orders: number; revenue: number }> = {};
+    data.employees.forEach(e => { stats[e.id] = { orders: 0, revenue: 0 }; });
+    data.workOrders.forEach(o => {
+      const involved = new Set<string>();
+      o.services.forEach(s => { if (stats[s.masterId]) involved.add(s.masterId); });
+      if (o.masterId && stats[o.masterId]) involved.add(o.masterId);
+      involved.forEach(eid => {
+        stats[eid].orders += 1;
+        if (o.isPaid) {
+          stats[eid].revenue += o.services.filter(s => s.masterId === eid).reduce((a, s) => a + s.price, 0);
+        }
+      });
+    });
+    return stats;
+  }, [data.employees, data.workOrders]);
+
+  const openModal = (employee?: Employee) => {
+    setEditEmployee(employee || null);
+    setForm(employee || { name: '', role: 'Master', dailyRate: 0, bonusPercentage: 0 });
+    setShowModal(true);
+  };
+
+  const handleSave = () => {
+    if (!form.name) return;
+    const employee: Employee = {
+      id: editEmployee?.id || generateId(),
+      name: form.name!,
+      role: form.role || 'Master',
+      dailyRate: form.dailyRate || 0,
+      bonusPercentage: form.bonusPercentage || 0,
+    };
+    if (editEmployee) {
+      updateData({ employees: data.employees.map(e => e.id === editEmployee.id ? employee : e) });
+    } else {
+      updateData({ employees: [...data.employees, employee] });
+    }
+    setShowModal(false);
+  };
+
+  const handleDelete = (id: string) => {
+    if (!confirm('Видалити співробітника?')) return;
+    updateData({ employees: data.employees.filter(e => e.id !== id) });
+  };
+
+  const masters = data.employees.filter(e => e.role === 'Master');
+  const managers = data.employees.filter(e => e.role === 'Manager');
+
+  return (
+    <div className="space-y-4">
+      {/* Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-white p-4 rounded-xl border shadow-sm">
+          <p className="text-neutral-500 text-sm">Всього співробітників</p>
+          <p className="text-2xl font-bold">{data.employees.length}</p>
+          <p className="text-xs text-neutral-400 mt-1">Майстрів: {masters.length} · Менеджерів: {managers.length}</p>
+        </div>
+        <div className="bg-white p-4 rounded-xl border shadow-sm">
+          <p className="text-neutral-500 text-sm">Середня денна ставка</p>
+          <p className="text-2xl font-bold text-blue-600">
+            {data.employees.length > 0
+              ? Math.round(data.employees.reduce((a, e) => a + e.dailyRate, 0) / data.employees.length).toLocaleString()
+              : 0} ₴
+          </p>
+        </div>
+        <div className="bg-white p-4 rounded-xl border shadow-sm">
+          <p className="text-neutral-500 text-sm">У пошуку</p>
+          <p className="text-2xl font-bold">{filtered.length}</p>
+        </div>
+      </div>
+
+      <div className="flex justify-end">
+        <button
+          onClick={() => openModal()}
+          className="bg-[#ffcc00] text-black px-4 py-2 rounded-xl font-bold flex items-center gap-2"
+        >
+          <Plus size={18} /> Додати співробітника
+        </button>
+      </div>
+
+      <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-neutral-50 border-b text-[10px] uppercase font-bold text-neutral-500">
+              <tr>
+                <th className="px-4 py-3 text-left">Співробітник</th>
+                <th className="px-4 py-3 text-left">Роль</th>
+                <th className="px-4 py-3 text-right">Денна ставка</th>
+                <th className="px-4 py-3 text-right">Бонус %</th>
+                <th className="px-4 py-3 text-center">Замовлень</th>
+                <th className="px-4 py-3 text-right">Дохід з робіт</th>
+                <th className="px-4 py-3"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-10 text-center text-neutral-400">
+                    <UserCog size={32} className="mx-auto mb-2 opacity-30" />
+                    <p>Співробітників не знайдено</p>
+                  </td>
+                </tr>
+              ) : (
+                filtered.map(employee => {
+                  const stats = employeeStats[employee.id] || { orders: 0, revenue: 0 };
+                  return (
+                    <tr key={employee.id} className="hover:bg-neutral-50">
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 bg-[#ffcc00]/20 rounded-full flex items-center justify-center font-bold text-sm">
+                            {employee.name.charAt(0)}
+                          </div>
+                          <div>
+                            <p className="font-semibold">{employee.name}</p>
+                            <p className="text-[10px] text-neutral-400">ID: {employee.id}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`px-2 py-1 rounded-full text-xs font-bold ${roleColors[employee.role]}`}>
+                          {roleLabels[employee.role]}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right font-bold">{employee.dailyRate.toLocaleString()} ₴</td>
+                      <td className="px-4 py-3 text-right">
+                        <span className="font-bold text-purple-600">{employee.bonusPercentage}%</span>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <span className="px-2 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-bold">{stats.orders}</span>
+                      </td>
+                      <td className="px-4 py-3 text-right font-bold text-green-600">{stats.revenue.toLocaleString()} ₴</td>
+                      <td className="px-4 py-3">
+                        <div className="flex gap-1 justify-end">
+                          <button onClick={() => openModal(employee)} className="p-1.5 text-neutral-400 hover:text-blue-600 rounded"><Edit2 size={14} /></button>
+                          <button onClick={() => handleDelete(employee.id)} className="p-1.5 text-neutral-400 hover:text-red-600 rounded"><Trash2 size={14} /></button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {showModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl w-full max-w-md shadow-2xl overflow-hidden">
+            <div className="p-5 border-b bg-neutral-50 flex justify-between items-center">
+              <h3 className="font-bold text-lg flex items-center gap-2">
+                <UserCog className="text-[#ffcc00]" size={20} />
+                {editEmployee ? 'Редагувати співробітника' : 'Новий співробітник'}
+              </h3>
+              <button onClick={() => setShowModal(false)}><X size={20} className="text-neutral-400" /></button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-neutral-600 mb-1">Ім'я *</label>
+                <input
+                  type="text"
+                  value={form.name || ''}
+                  onChange={e => setForm({ ...form, name: e.target.value })}
+                  className="w-full p-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#ffcc00]"
+                  placeholder="Прізвище Ім'я"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-neutral-600 mb-1">Роль</label>
+                <select
+                  value={form.role || 'Master'}
+                  onChange={e => setForm({ ...form, role: e.target.value as Employee['role'] })}
+                  className="w-full p-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#ffcc00]"
+                >
+                  {(Object.entries(roleLabels) as [Employee['role'], string][]).map(([k, v]) => (
+                    <option key={k} value={k}>{v}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-neutral-600 mb-1 flex items-center gap-1"><DollarSign size={12} /> Денна ставка (₴)</label>
+                  <input
+                    type="number"
+                    value={form.dailyRate ?? ''}
+                    onChange={e => setForm({ ...form, dailyRate: Number(e.target.value) })}
+                    className="w-full p-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#ffcc00]"
+                    min={0}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-neutral-600 mb-1">Бонус (%)</label>
+                  <input
+                    type="number"
+                    value={form.bonusPercentage ?? ''}
+                    onChange={e => setForm({ ...form, bonusPercentage: Number(e.target.value) })}
+                    className="w-full p-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#ffcc00]"
+                    min={0}
+                    max={100}
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="p-5 border-t bg-neutral-50 flex gap-3 justify-end">
+              <button onClick={() => setShowModal(false)} className="px-5 py-2 rounded-lg text-neutral-600 hover:bg-neutral-100">Скасувати</button>
+              <button onClick={handleSave} className="bg-[#ffcc00] text-black px-5 py-2 rounded-lg font-bold flex items-center gap-2">
                 <Save size={16} /> Зберегти
               </button>
             </div>
