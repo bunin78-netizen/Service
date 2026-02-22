@@ -37,6 +37,7 @@ import DatabasePage from './pages/Database';
 import SupplierShop from './pages/SupplierShop';
 import RROPage from './pages/RRO';
 import Login from './pages/Login';
+import WarehouseDocuments from './pages/WarehouseDocuments';
 import { sendTelegramNotification } from './pages/Telegram';
 
 export function App() {
@@ -157,6 +158,7 @@ export function App() {
       label: 'Склад',
       items: [
         { id: 'inventory', label: 'Склад', icon: Package },
+        { id: 'warehousedocs', label: 'Складські документи', icon: Receipt },
         { id: 'suppliershop', label: 'Замовлення запчастин', icon: ShoppingBag },
         { id: 'database', label: 'Бази даних', icon: Database },
       ],
@@ -187,6 +189,7 @@ export function App() {
       case 'dashboard': return <Dashboard data={data} setActiveTab={setActiveTab} />;
       case 'clients': return <Clients data={data} updateData={updateData} addNotification={addNotification} />;
       case 'inventory': return <Inventory data={data} updateData={updateData} />;
+      case 'warehousedocs': return <WarehouseDocuments data={data} updateData={updateData} />;
       case 'workorders': return <WorkOrders data={data} updateData={updateData} addNotification={addNotification} />;
       case 'diagnosis': return <WorkOrders data={data} updateData={updateData} addNotification={addNotification} openDiagnosisByDefault />;
       case 'suppliershop': return <SupplierShop data={data} updateData={updateData} />;

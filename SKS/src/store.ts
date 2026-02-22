@@ -160,6 +160,41 @@ const INITIAL_DATA: AppData = {
     rroEnabled: false,
     rroApiKey: '',
   },
+  warehouseDocuments: [
+    {
+      id: 'wd1',
+      type: 'incoming',
+      number: 'ПН-0001',
+      date: '2023-10-01',
+      supplierId: 's1',
+      note: 'Перше надходження',
+      items: [
+        { partId: '1', quantity: 10, price: 1200 },
+        { partId: '4', quantity: 5, price: 450 },
+      ],
+    },
+    {
+      id: 'wd2',
+      type: 'incoming',
+      number: 'ПН-0002',
+      date: '2023-10-08',
+      supplierId: 's4',
+      note: '',
+      items: [
+        { partId: '5', quantity: 12, price: 320 },
+      ],
+    },
+    {
+      id: 'wd3',
+      type: 'writeoff',
+      number: 'СП-0001',
+      date: '2023-10-10',
+      note: 'Пошкоджені товари',
+      items: [
+        { partId: '2', quantity: 1, price: 150 },
+      ],
+    },
+  ],
   telegramSettings: {
     enabled: false,
     botToken: '',
@@ -184,6 +219,7 @@ export function loadData(): AppData {
       users: parsed.users || INITIAL_DATA.users,
       notifications: parsed.notifications || INITIAL_DATA.notifications,
       currentUserId: parsed.currentUserId || INITIAL_DATA.currentUserId,
+      warehouseDocuments: parsed.warehouseDocuments || INITIAL_DATA.warehouseDocuments,
     };
   }
   return INITIAL_DATA;
