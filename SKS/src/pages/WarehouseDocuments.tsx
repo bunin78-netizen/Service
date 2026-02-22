@@ -1,0 +1,362 @@
+import { useState } from 'react';
+import { AppData, WarehouseDocument, WarehouseDocumentItem } from '../types';
+import { Plus, FileText, X, Save, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
+import { generateId } from '../store';
+
+const DOC_TYPE_LABELS: Record<WarehouseDocument['type'], string> = {
+  incoming: 'Прихід',
+  outgoing: 'Видаток',
+  writeoff: 'Списання',
+};
+
+const DOC_TYPE_COLORS: Record<WarehouseDocument['type'], string> = {
+  incoming: 'bg-green-100 text-green-700',
+  outgoing: 'bg-blue-100 text-blue-700',
+  writeoff: 'bg-red-100 text-red-700',
+};
+
+const EMPTY_FORM: Omit<WarehouseDocument, 'id'> = {
+  type: 'incoming',
+  number: '',
+  date: new Date().toISOString().split('T')[0],
+  supplierId: '',
+  note: '',
+  items: [],
+};
+
+export default function WarehouseDocuments({
+  data,
+  updateData,
+}: {
+  data: AppData;
+  updateData: (d: Partial<AppData>) => void;
+}) {
+  const [showModal, setShowModal] = useState(false);
+  const [editingDoc, setEditingDoc] = useState<WarehouseDocument | null>(null);
+  const [form, setForm] = useState<Omit<WarehouseDocument, 'id'>>(EMPTY_FORM);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  const docs = data.warehouseDocuments || [];
+
+  const openNew = () => {
+    setEditingDoc(null);
+    setForm({ ...EMPTY_FORM, date: new Date().toISOString().split('T')[0], items: [] });
+    setShowModal(true);
+  };
+
+  const openEdit = (doc: WarehouseDocument) => {
+    setEditingDoc(doc);
+    setForm({
+      type: doc.type,
+      number: doc.number,
+      date: doc.date,
+      supplierId: doc.supplierId || '',
+      note: doc.note || '',
+      items: doc.items.map(i => ({ ...i })),
+    });
+    setShowModal(true);
+  };
+
+  const handleSave = () => {
+    if (!form.number.trim() || !form.date) return;
+    if (editingDoc) {
+      const updated = docs.map(d =>
+        d.id === editingDoc.id ? { ...d, ...form } : d
+      );
+      updateData({ warehouseDocuments: updated });
+    } else {
+      const newDoc: WarehouseDocument = { id: generateId(), ...form };
+      updateData({ warehouseDocuments: [newDoc, ...docs] });
+    }
+    setShowModal(false);
+  };
+
+  const handleDelete = (id: string) => {
+    if (!confirm('Видалити документ?')) return;
+    updateData({ warehouseDocuments: docs.filter(d => d.id !== id) });
+  };
+
+  const addItem = () => {
+    if (data.inventory.length === 0) return;
+    setForm(prev => ({
+      ...prev,
+      items: [...prev.items, { partId: data.inventory[0].id, quantity: 1, price: 0 }],
+    }));
+  };
+
+  const updateItem = (idx: number, patch: Partial<WarehouseDocumentItem>) => {
+    setForm(prev => ({
+      ...prev,
+      items: prev.items.map((item, i) => (i === idx ? { ...item, ...patch } : item)),
+    }));
+  };
+
+  const removeItem = (idx: number) => {
+    setForm(prev => ({ ...prev, items: prev.items.filter((_, i) => i !== idx) }));
+  };
+
+  const docTotal = (doc: WarehouseDocument) =>
+    doc.items.reduce((sum, it) => sum + it.quantity * it.price, 0);
+
+  return (
+    <div className="space-y-6">
+      {/* Summary cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {(['incoming', 'outgoing', 'writeoff'] as const).map(type => (
+          <div key={type} className="bg-white p-6 rounded-2xl shadow-sm border">
+            <p className="text-neutral-500 text-sm mb-1">{DOC_TYPE_LABELS[type]}</p>
+            <h3 className="text-2xl font-bold text-neutral-900">
+              {docs.filter(d => d.type === type).length} докум.
+            </h3>
+          </div>
+        ))}
+      </div>
+
+      {/* Table */}
+      <div className="bg-white rounded-2xl shadow-sm border overflow-hidden">
+        <div className="p-4 border-b flex items-center justify-between bg-neutral-50/50">
+          <h3 className="font-bold text-base">Складські документи</h3>
+          <button
+            onClick={openNew}
+            className="bg-[#ffcc00] text-black px-4 py-2 rounded-xl font-bold flex items-center gap-2 hover:bg-[#e6b800] transition-colors shadow-sm text-sm"
+          >
+            <Plus size={18} /> Новий документ
+          </button>
+        </div>
+
+        {docs.length === 0 ? (
+          <div className="p-12 text-center text-neutral-400">
+            <FileText size={40} className="mx-auto mb-3 opacity-30" />
+            <p>Немає складських документів</p>
+          </div>
+        ) : (
+          <div className="divide-y">
+            {docs.map(doc => (
+              <div key={doc.id}>
+                <div
+                  className="flex items-center gap-4 px-6 py-4 hover:bg-neutral-50 cursor-pointer transition-colors"
+                  onClick={() => setExpandedId(expandedId === doc.id ? null : doc.id)}
+                >
+                  <span className={`px-2.5 py-1 rounded-lg text-xs font-bold ${DOC_TYPE_COLORS[doc.type]}`}>
+                    {DOC_TYPE_LABELS[doc.type]}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-sm text-neutral-900">{doc.number}</p>
+                    <p className="text-xs text-neutral-400">{doc.date}</p>
+                  </div>
+                  {doc.supplierId && (
+                    <span className="text-xs text-neutral-500 hidden md:block">
+                      {data.suppliers.find(s => s.id === doc.supplierId)?.name || ''}
+                    </span>
+                  )}
+                  <span className="font-bold text-sm text-neutral-700">
+                    {docTotal(doc).toLocaleString()} ₴
+                  </span>
+                  <div className="flex gap-1 ml-2" onClick={e => e.stopPropagation()}>
+                    <button
+                      onClick={() => openEdit(doc)}
+                      className="p-1.5 text-neutral-400 hover:text-blue-600 rounded-lg hover:bg-blue-50"
+                    >
+                      <FileText size={15} />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(doc.id)}
+                      className="p-1.5 text-neutral-400 hover:text-red-600 rounded-lg hover:bg-red-50"
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  </div>
+                  {expandedId === doc.id ? (
+                    <ChevronUp size={16} className="text-neutral-400" />
+                  ) : (
+                    <ChevronDown size={16} className="text-neutral-400" />
+                  )}
+                </div>
+
+                {/* Expanded rows */}
+                {expandedId === doc.id && doc.items.length > 0 && (
+                  <div className="px-8 pb-4 bg-neutral-50/60">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="text-neutral-400 text-xs uppercase border-b">
+                          <th className="py-2 text-left font-bold">Запчастина</th>
+                          <th className="py-2 text-right font-bold">Кількість</th>
+                          <th className="py-2 text-right font-bold">Ціна</th>
+                          <th className="py-2 text-right font-bold">Сума</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-neutral-100">
+                        {doc.items.map((item, idx) => {
+                          const part = data.inventory.find(p => p.id === item.partId);
+                          return (
+                            <tr key={idx}>
+                              <td className="py-2 text-neutral-700">{part?.name || '(видалено)'}</td>
+                              <td className="py-2 text-right text-neutral-600">{item.quantity} шт</td>
+                              <td className="py-2 text-right text-neutral-600">{item.price} ₴</td>
+                              <td className="py-2 text-right font-bold text-neutral-800">
+                                {(item.quantity * item.price).toLocaleString()} ₴
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                    {doc.note && (
+                      <p className="mt-2 text-xs text-neutral-400 italic">Примітка: {doc.note}</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Modal */}
+      {showModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+            <div className="p-6 border-b bg-neutral-50 flex items-center justify-between shrink-0">
+              <h3 className="font-bold text-lg">
+                {editingDoc ? 'Редагування документа' : 'Новий складський документ'}
+              </h3>
+              <button onClick={() => setShowModal(false)} className="text-neutral-400 hover:text-neutral-600">
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4 overflow-y-auto flex-1">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-neutral-700 mb-1">Тип документа</label>
+                  <select
+                    value={form.type}
+                    onChange={e => setForm({ ...form, type: e.target.value as WarehouseDocument['type'] })}
+                    className="w-full p-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#ffcc00]"
+                  >
+                    {(Object.keys(DOC_TYPE_LABELS) as WarehouseDocument['type'][]).map(t => (
+                      <option key={t} value={t}>{DOC_TYPE_LABELS[t]}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-neutral-700 mb-1">Номер *</label>
+                  <input
+                    type="text"
+                    value={form.number}
+                    onChange={e => setForm({ ...form, number: e.target.value })}
+                    className="w-full p-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#ffcc00]"
+                    placeholder="ПН-0001"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-neutral-700 mb-1">Дата *</label>
+                  <input
+                    type="date"
+                    value={form.date}
+                    onChange={e => setForm({ ...form, date: e.target.value })}
+                    className="w-full p-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#ffcc00]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-neutral-700 mb-1">Постачальник</label>
+                  <select
+                    value={form.supplierId || ''}
+                    onChange={e => setForm({ ...form, supplierId: e.target.value })}
+                    className="w-full p-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#ffcc00]"
+                  >
+                    <option value="">— не вказано —</option>
+                    {data.suppliers.map(s => (
+                      <option key={s.id} value={s.id}>{s.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-neutral-700 mb-1">Примітка</label>
+                <input
+                  type="text"
+                  value={form.note || ''}
+                  onChange={e => setForm({ ...form, note: e.target.value })}
+                  className="w-full p-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#ffcc00]"
+                  placeholder="Необов'язково"
+                />
+              </div>
+
+              {/* Items */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-sm font-medium text-neutral-700">Товари</label>
+                  <button
+                    onClick={addItem}
+                    disabled={data.inventory.length === 0}
+                    className="text-xs text-blue-600 hover:underline flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
+                    title={data.inventory.length === 0 ? 'Склад порожній' : undefined}
+                  >
+                    <Plus size={13} /> Додати рядок
+                  </button>
+                </div>
+                <div className="space-y-2">
+                  {form.items.map((item, idx) => (
+                    <div key={idx} className="grid grid-cols-[1fr_80px_90px_32px] gap-2 items-center">
+                      <select
+                        value={item.partId}
+                        onChange={e => updateItem(idx, { partId: e.target.value })}
+                        className="p-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#ffcc00] text-sm"
+                      >
+                        {data.inventory.map(p => (
+                          <option key={p.id} value={p.id}>{p.name}</option>
+                        ))}
+                      </select>
+                      <input
+                        type="number"
+                        min={1}
+                        value={item.quantity}
+                        onChange={e => updateItem(idx, { quantity: Number(e.target.value) })}
+                        className="p-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#ffcc00] text-sm"
+                        placeholder="Кіл."
+                      />
+                      <input
+                        type="number"
+                        min={0}
+                        value={item.price}
+                        onChange={e => updateItem(idx, { price: Number(e.target.value) })}
+                        className="p-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#ffcc00] text-sm"
+                        placeholder="Ціна"
+                      />
+                      <button
+                        onClick={() => removeItem(idx)}
+                        className="p-1.5 text-red-400 hover:text-red-600 rounded-lg hover:bg-red-50"
+                      >
+                        <X size={15} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6 border-t bg-neutral-50 flex gap-3 justify-end shrink-0">
+              <button
+                onClick={() => setShowModal(false)}
+                className="px-6 py-2 rounded-lg font-medium text-neutral-600 hover:bg-neutral-100"
+              >
+                Скасувати
+              </button>
+              <button
+                onClick={handleSave}
+                className="bg-[#ffcc00] text-black px-6 py-2 rounded-lg font-bold flex items-center gap-2"
+              >
+                <Save size={18} /> Зберегти
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

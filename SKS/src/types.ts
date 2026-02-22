@@ -144,6 +144,22 @@ export type TelegramSettings = {
   welcomeMessage: string;
 };
 
+export type WarehouseDocumentItem = {
+  partId: string;
+  quantity: number;
+  price: number;
+};
+
+export type WarehouseDocument = {
+  id: string;
+  type: 'incoming' | 'outgoing' | 'writeoff';
+  number: string;
+  date: string;
+  supplierId?: string;
+  note?: string;
+  items: WarehouseDocumentItem[];
+};
+
 export type AppData = {
   clients: Client[];
   inventory: Part[];
@@ -161,4 +177,5 @@ export type AppData = {
     rroApiKey: string;
   };
   telegramSettings: TelegramSettings;
+  warehouseDocuments: WarehouseDocument[];
 };
