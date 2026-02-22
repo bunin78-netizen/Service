@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Background -->
+  <rect width="512" height="512" rx="80" fill="#1a1a1a"/>
+  
+  <!-- Yellow gear / wrench shape -->
+  <circle cx="256" cy="220" r="110" fill="#ffcc00"/>
+  <circle cx="256" cy="220" r="55" fill="#1a1a1a"/>
+  
+  <!-- Gear teeth -->
+  <rect x="236" y="90" width="40" height="50" rx="8" fill="#ffcc00"/>
+  <rect x="236" y="300" width="40" height="50" rx="8" fill="#ffcc00"/>
+  <rect x="126" y="200" width="50" height="40" rx="8" fill="#ffcc00"/>
+  <rect x="336" y="200" width="50" height="40" rx="8" fill="#ffcc00"/>
+  
+  <!-- Diagonal teeth -->
+  <rect x="145" y="120" width="40" height="50" rx="8" fill="#ffcc00" transform="rotate(45 165 145)"/>
+  <rect x="327" y="120" width="40" height="50" rx="8" fill="#ffcc00" transform="rotate(-45 347 145)"/>
+  <rect x="145" y="270" width="40" height="50" rx="8" fill="#ffcc00" transform="rotate(-45 165 295)"/>
+  <rect x="327" y="270" width="40" height="50" rx="8" fill="#ffcc00" transform="rotate(45 347 295)"/>
+
+  <!-- Wrench handle -->
+  <rect x="228" y="260" width="56" height="140" rx="16" fill="#ffcc00"/>
+  
+  <!-- SK Text -->
+  <text x="256" y="430" font-family="Arial Black, sans-serif" font-size="52" font-weight="900" fill="#ffcc00" text-anchor="middle" letter-spacing="2">SK</text>
+  
+  <!-- Small dot accent -->
+  <circle cx="256" cy="220" r="18" fill="#ffcc00"/>
+</svg>
