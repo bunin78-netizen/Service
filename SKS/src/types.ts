@@ -148,17 +148,22 @@ export type WarehouseDocumentItem = {
   partId: string;
   quantity: number;
   price: number;
+  id?: string;
+  name?: string;
 };
 
 export type WarehouseDocument = {
   id: string;
-  type: 'incoming' | 'outgoing' | 'writeoff';
+  type: 'incoming' | 'outgoing' | 'writeoff' | 'inventory' | 'return';
   number: string;
   date: string;
   supplierId?: string;
   clientId?: string;
   note?: string;
+  notes?: string;
   items: WarehouseDocumentItem[];
+  status?: 'draft' | 'completed';
+  createdAt?: string;
 };
 
 export type AppData = {
