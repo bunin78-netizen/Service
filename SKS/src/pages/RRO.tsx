@@ -4,9 +4,10 @@ import {
   Printer, CheckCircle, AlertCircle, Loader2, Receipt, Settings,
   Wifi, WifiOff, DollarSign, CreditCard, Building, X,
   FileText, Clock, TrendingUp, Hash, ShieldCheck, Zap, Eye,
-  Download, ChevronDown, ChevronUp, RefreshCw
+  Download, ChevronDown, ChevronUp, RefreshCw, Send, Loader
 } from 'lucide-react';
 import { format } from 'date-fns';
+import { sendTelegramFiscalReceipt } from './Telegram';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 type RROProvider = {
@@ -203,6 +204,7 @@ export default function RROPage({ data, updateData }: Props) {
   const [expandedProvider, setExpandedProvider] = useState<string | null>(null);
   const [xReportLoading, setXReportLoading] = useState(false);
   const [filterPayment, setFilterPayment] = useState<'all' | 'Cash' | 'Card' | 'Bank'>('all');
+  const [fiscalTgStatus, setFiscalTgStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [manualPayment, setManualPayment] = useState({
     description: '',
     amount: 0,
@@ -343,6 +345,27 @@ export default function RROPage({ data, updateData }: Props) {
     );
     updateData({ workOrders: updatedOrders });
 
+    // Auto-send fiscal receipt via Telegram if enabled
+    if (data.telegramSettings?.sendFiscalReceipts) {
+      const cs = data.companySettings;
+      sendTelegramFiscalReceipt(data.telegramSettings, {
+        orderId: receipt.orderId,
+        clientName: receipt.clientName,
+        amount: receipt.amount,
+        paymentType: receipt.paymentType,
+        fiscalNumber: receipt.fiscalNumber,
+        checkNumber: receipt.checkNumber,
+        qrCode: receipt.qrCode,
+        dateTime: receipt.dateTime,
+        provider: receipt.provider,
+        cashier: receipt.cashier,
+        companyName: cs.name,
+        companyAddress: cs.address,
+        edrpou: cs.edrpou,
+        items: receipt.items,
+      });
+    }
+
     setSelectedReceipt(receipt);
     setShowReceiptModal(true);
   };
@@ -374,6 +397,35 @@ export default function RROPage({ data, updateData }: Props) {
     setManualPayment({ description: '', amount: 0, paymentType: 'Cash', clientName: '' });
     setSelectedReceipt(receipt);
     setShowReceiptModal(true);
+  };
+
+  // ── Send fiscal receipt to Telegram ──────────────────────────────────────
+  const handleSendFiscalReceiptToTelegram = async (receipt: FiscalReceipt) => {
+    const tg = data.telegramSettings;
+    if (!tg?.enabled || !tg.botToken || !tg.chatId) return;
+    const cs = data.companySettings;
+    setFiscalTgStatus('loading');
+    const ok = await sendTelegramFiscalReceipt(
+      tg,
+      {
+        orderId: receipt.orderId,
+        clientName: receipt.clientName,
+        amount: receipt.amount,
+        paymentType: receipt.paymentType,
+        fiscalNumber: receipt.fiscalNumber,
+        checkNumber: receipt.checkNumber,
+        qrCode: receipt.qrCode,
+        dateTime: receipt.dateTime,
+        provider: receipt.provider,
+        cashier: receipt.cashier,
+        companyName: cs.name,
+        companyAddress: cs.address,
+        edrpou: cs.edrpou,
+        items: receipt.items,
+      }
+    );
+    setFiscalTgStatus(ok ? 'success' : 'error');
+    setTimeout(() => setFiscalTgStatus('idle'), 4000);
   };
 
   // ── Print receipt ─────────────────────────────────────────────────────────
@@ -1314,13 +1366,36 @@ export default function RROPage({ data, updateData }: Props) {
               <div className="text-center text-neutral-500">Дякуємо за звернення!</div>
             </div>
 
-            <div className="p-4 border-t bg-neutral-50 flex gap-3">
+            <div className="p-4 border-t bg-neutral-50 flex gap-3 flex-wrap">
               <button
                 onClick={() => handlePrintReceipt(selectedReceipt)}
                 className="flex-1 bg-neutral-900 text-white py-2.5 rounded-xl font-bold flex items-center justify-center gap-2"
               >
                 <Printer size={16} /> Друк
               </button>
+              {data.telegramSettings?.enabled && data.telegramSettings?.sendFiscalReceipts && (
+                <button
+                  onClick={() => handleSendFiscalReceiptToTelegram(selectedReceipt)}
+                  disabled={fiscalTgStatus === 'loading'}
+                  className={`flex-1 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-colors ${
+                    fiscalTgStatus === 'success'
+                      ? 'bg-green-100 text-green-700'
+                      : fiscalTgStatus === 'error'
+                      ? 'bg-red-100 text-red-700'
+                      : 'bg-blue-500 text-white hover:bg-blue-600'
+                  } disabled:opacity-50`}
+                >
+                  {fiscalTgStatus === 'loading' ? (
+                    <><Loader size={16} className="animate-spin" /> Відправка...</>
+                  ) : fiscalTgStatus === 'success' ? (
+                    <><CheckCircle size={16} /> Відправлено!</>
+                  ) : fiscalTgStatus === 'error' ? (
+                    <><AlertCircle size={16} /> Помилка</>
+                  ) : (
+                    <><Send size={16} /> Telegram</>
+                  )}
+                </button>
+              )}
               <button
                 onClick={() => setShowReceiptModal(false)}
                 className="px-5 py-2.5 border rounded-xl font-medium text-neutral-600 hover:bg-neutral-100"

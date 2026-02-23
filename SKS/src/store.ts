@@ -211,6 +211,8 @@ const INITIAL_DATA: AppData = {
     notifyPaymentReceived: true,
     notifyNewClient: true,
     sendReceipts: false,
+    sendFiscalReceipts: false,
+    sendDocuments: false,
     welcomeMessage: 'Вітаємо в SmartKharkov! 🚗 Ми допоможемо вам з ремонтом та обслуговуванням вашого авто.',
   },
   viberSettings: {
