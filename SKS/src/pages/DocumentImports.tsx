@@ -188,7 +188,7 @@ export default function DocumentImports({ data, updateData }: { data: AppData; u
       <div className="bg-white p-6 rounded-2xl border shadow-sm">
         <h2 className="text-xl font-bold mb-3">Імпорт документів постачальника</h2>
         <input type="file" accept="application/pdf,.xlsx,.xls,.csv,.xml,text/csv,text/xml,application/xml" disabled={busy} onChange={(e) => onUpload(e.target.files?.[0])} className="block w-full text-sm" />
-        <p className="text-xs text-neutral-500 mt-2">Підтримувані формати: PDF, Excel (.xlsx/.xls), CSV, XML. Для демо: Expense_0318580_19.02.2026.pdf</p>
+        <p className="text-xs text-neutral-500 mt-2">Підтримувані формати: PDF, Excel (.xlsx/.xls), CSV, XML.</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
