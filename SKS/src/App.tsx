@@ -216,7 +216,6 @@ export function App() {
       label: 'Система',
       items: [
         ...(!isMaster ? [{ id: 'telegram', label: 'Telegram Бот', icon: Bot }] : []),
-        ...(!isMaster ? [{ id: 'viber', label: 'Viber Бот', icon: MessageCircle }] : []),
         ...(isAdmin ? [{ id: 'users', label: 'Користувачі', icon: UserCog }] : []),
         ...(isAdmin ? [{ id: 'settings', label: 'Налаштування', icon: Settings }] : []),
       ],
@@ -247,7 +246,6 @@ export function App() {
       case 'expenses': return isMaster ? accessDenied : <Expenses data={data} updateData={updateData} />;
       case 'rro': return isMaster ? accessDenied : <RROPage data={data} updateData={updateData} />;
       case 'telegram': return isMaster ? accessDenied : <TelegramPage data={data} onSave={(d) => setData(d)} />;
-      case 'viber': return isMaster ? accessDenied : <ViberPage data={data} onSave={(d) => setData(d)} />;
       case 'users': return isAdmin ? <UsersPage data={data} updateData={updateData} /> : accessDenied;
       case 'settings': return isAdmin ? <SettingsPage data={data} updateData={updateData} /> : accessDenied;
       case 'database': return <DatabasePage data={data} updateData={updateData} />;
