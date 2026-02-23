@@ -30,7 +30,7 @@ function parseExpenseFilename(fileName: string): { docNumber: string; docDate: s
   if (parts.length < 3 || parts[0].toLowerCase() !== 'expense') return null;
   const docNumber = parts[1];
   if (!docNumber) return null;
-  const rawDate = parts[2]; // DD.MM.YYYY
+  const rawDate = parts[parts.length - 1]; // Last segment: DD.MM.YYYY (handles extra segments in filename)
   const dateParts = rawDate.split('.');
   if (dateParts.length !== 3) return null;
   const [dd, mm, yyyy] = dateParts;
@@ -63,7 +63,10 @@ export class MockExtractor implements DocumentExtractor {
       return {
         docNumber: parsed.docNumber,
         docDate: parsed.docDate,
-        lines: [],
+        lines: [
+          { name: 'Мастило 5W30 4л', supplierSku: 'OIL-5W30-4L', barcode: '482000000001', qty: 2, unit: 'шт', priceNet: 1000, vatRate: 0.2, lineTotal: 2400, confidence: 0.98 },
+          { name: 'Антифриз G12 5л', supplierSku: 'COOL-5L', barcode: '482000000004', qty: 1, unit: 'шт', priceNet: 850, vatRate: 0.2, lineTotal: 1020, confidence: 0.89 },
+        ],
       };
     }
 
