@@ -1,3 +1,4 @@
+import * as XLSX from '@e965/xlsx';
 import { AppData, ImportJob, ImportLine, Part, ReceiptDraft, SupplierProductMap } from '../types';
 import { generateId } from '../store';
 
@@ -20,12 +21,112 @@ export type ExtractedDocument = {
 };
 
 export interface DocumentExtractor {
-  extract(fileName: string): Promise<ExtractedDocument>;
+  extract(fileName: string, file?: File): Promise<ExtractedDocument>;
 }
 
-/** Parse filenames like Expense_0318580_19.02.2026.pdf → { docNumber, docDate } */
+/** Detect CSV separator from first line */
+function detectSeparator(firstLine: string): string {
+  const counts: Record<string, number> = { ',': 0, ';': 0, '\t': 0 };
+  for (const ch of firstLine) if (ch in counts) counts[ch]++;
+  return Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0];
+}
+
+/** Map a header name to a canonical field key */
+function mapHeader(h: string): string {
+  const s = h.trim().toLowerCase();
+  if (/^(назва|найменування|товар|name|опис|description)/.test(s)) return 'name';
+  if (/^(артикул|sku|код постачальника|supplier.?sku|part.?no)/.test(s)) return 'sku';
+  if (/^(штрихкод|barcode|ean|upc)/.test(s)) return 'barcode';
+  if (/^(кіл|кількість|qty|quantity|кол)/.test(s)) return 'qty';
+  if (/^(од|одиниця|unit|уп|упак)/.test(s)) return 'unit';
+  if (/^(ціна\s*(без|нетто|net)|price.?(net|excl)|нетто)/.test(s)) return 'priceNet';
+  if (/^(ціна|price|вартість|cost)/.test(s)) return 'price';
+  if (/^(пдв\s*%|vat\s*%|vat.?rate|ставка пдв)/.test(s)) return 'vatRate';
+  if (/^(сума|разом|total|line.?total|підсумок)/.test(s)) return 'lineTotal';
+  return s;
+}
+
+/** Parse rows from an array-of-rows (from XLSX or CSV) into ExtractedDocument lines */
+function rowsToLines(rows: unknown[][]): ExtractedDocument['lines'] {
+  if (rows.length < 2) return [];
+  const headerRow = rows[0] as string[];
+  const keyMap: Record<number, string> = {};
+  headerRow.forEach((h, i) => { if (h != null) keyMap[i] = mapHeader(String(h)); });
+
+  const lines: ExtractedDocument['lines'] = [];
+  for (let r = 1; r < rows.length; r++) {
+    const row = rows[r] as unknown[];
+    const get = (key: string): string => {
+      const idx = Object.entries(keyMap).find(([, v]) => v === key)?.[0];
+      return idx != null ? String(row[Number(idx)] ?? '').trim() : '';
+    };
+
+    const name = get('name');
+    if (!name) continue;
+
+    const qtyRaw = get('qty');
+    const qty = parseNum(qtyRaw || '1');
+    if (qty <= 0) continue;
+
+    const vatRateRaw = get('vatRate');
+    const vatRate = vatRateRaw ? parseNum(vatRateRaw) / (parseNum(vatRateRaw) > 1 ? 100 : 1) : 0.2;
+
+    let priceNet = parseNum(get('priceNet'));
+    if (!priceNet) {
+      const priceRaw = get('price');
+      const priceGross = parseNum(priceRaw);
+      priceNet = priceGross > 0 ? Number((priceGross / (1 + vatRate)).toFixed(4)) : 0;
+    }
+
+    const lineTotalRaw = get('lineTotal');
+    const lineTotal = lineTotalRaw ? parseNum(lineTotalRaw) : undefined;
+
+    lines.push({
+      name,
+      supplierSku: get('sku') || undefined,
+      barcode: get('barcode') || undefined,
+      qty,
+      unit: get('unit') || 'шт',
+      priceNet,
+      vatRate,
+      lineTotal,
+      confidence: 0.85,
+    });
+  }
+  return lines;
+}
+
+/** Extractor for Excel (.xlsx/.xls) and CSV files */
+export class ExcelCsvExtractor implements DocumentExtractor {
+  async extract(_fileName: string, file?: File): Promise<ExtractedDocument> {
+    if (!file) throw new Error('File object is required for Excel/CSV extraction');
+
+    const arrayBuffer = await file.arrayBuffer();
+    let rows: unknown[][];
+
+    if (file.name.toLowerCase().endsWith('.csv')) {
+      const text = new TextDecoder('utf-8').decode(arrayBuffer);
+      const allRows = text.split(/\r?\n/).filter(l => l.trim());
+      const sep = detectSeparator(allRows[0] || '');
+      rows = allRows.map(line => line.split(sep).map(cell => cell.replace(/^"|"$/g, '').trim()));
+    } else {
+      const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      rows = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: '' });
+    }
+
+    const lines = rowsToLines(rows);
+    return {
+      docNumber: undefined,
+      docDate: new Date().toISOString().split('T')[0],
+      lines,
+    };
+  }
+}
+
+/** Parse filenames like Expense_0318580_19.02.2026.pdf/.xlsx/.csv → { docNumber, docDate } */
 function parseExpenseFilename(fileName: string): { docNumber: string; docDate: string } | null {
-  const base = fileName.replace(/\.pdf$/i, '');
+  const base = fileName.replace(/\.(pdf|xlsx?|csv)$/i, '');
   const parts = base.split('_');
   if (parts.length < 3 || parts[0].toLowerCase() !== 'expense') return null;
   const docNumber = parts[1];
@@ -42,9 +143,9 @@ function parseExpenseFilename(fileName: string): { docNumber: string; docDate: s
 }
 
 export class MockExtractor implements DocumentExtractor {
-  async extract(fileName: string): Promise<ExtractedDocument> {
+  async extract(fileName: string, _file?: File): Promise<ExtractedDocument> {
     // Full demo data for the fixture file
-    if (fileName.includes('Expense_0318580_19.02.2026.pdf')) {
+    if (fileName.includes('Expense_0318580_19.02.2026')) {
       return {
         supplier: { name: 'Омега-Автопоставка', supplierId: 's1' },
         docNumber: '0318580',
@@ -89,7 +190,7 @@ export function createImportJob(data: AppData, payload: { filename: string; file
     && data.receiptDrafts.some(d => d.importJobId === data.importJobs.find(j => j.fileHash === payload.fileHash)?.id && d.status === 'POSTED');
 
   if (postedForHash) {
-    throw new Error('Цей PDF вже був проведений раніше. Повторний імпорт заборонений.');
+    throw new Error('Цей файл вже був проведений раніше. Повторний імпорт заборонений.');
   }
 
   const now = new Date().toISOString();
