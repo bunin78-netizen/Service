@@ -23,7 +23,8 @@ export default function DocumentImports({ data, updateData }: { data: AppData; u
   const [statusFilter, setStatusFilter] = useState<'' | ImportJobStatus>('');
   const [pendingImport, setPendingImport] = useState<PendingImport | null>(null);
   const [pendingSupplier, setPendingSupplier] = useState('');
-  const [pendingCategory, setPendingCategory] = useState('');
+  const [pendingCategoryProductIds, setPendingCategoryProductIds] = useState<string[] | null>(null);
+  const [pendingCategoryValue, setPendingCategoryValue] = useState('');
   const pdfExtractor = useMemo(() => new MockExtractor(), []);
   const excelCsvExtractor = useMemo(() => new ExcelCsvExtractor(), []);
   const xmlExtractor = useMemo(() => new XmlExtractor(), []);
@@ -64,7 +65,6 @@ export default function DocumentImports({ data, updateData }: { data: AppData; u
       if (processedJob && processedJob.status === 'DONE' && !processedJob.supplierId) {
         setPendingImport({ processedData: processed, jobId: job.id, originalInventoryLength: data.inventory.length });
         setPendingSupplier(data.suppliers[0]?.id || '');
-        setPendingCategory(data.categories[0]?.name || '');
         setSelectedJobId(job.id);
       } else {
         updateData({ importJobs: processed.importJobs, inventory: processed.inventory, supplierProductMap: processed.supplierProductMap });
@@ -88,7 +88,6 @@ export default function DocumentImports({ data, updateData }: { data: AppData; u
       ...processedData.inventory.slice(originalInventoryLength).map(p => ({
         ...p,
         supplierId: pendingSupplier,
-        category: pendingCategory,
       })),
     ];
     const job = processedData.importJobs.find(j => j.id === jobId);
@@ -120,6 +119,25 @@ export default function DocumentImports({ data, updateData }: { data: AppData; u
     if (!selectedJob) return;
     const next = createReceiptDraft(data, selectedJob.id);
     updateData({ receiptDrafts: next.receiptDrafts });
+    // After the document is created, offer category selection for any
+    // products from this import that still have no category assigned
+    const noCategorySet = new Set(data.inventory.filter(p => !p.category).map(p => p.id));
+    const noCategoryIds = selectedJob.lines
+      .map(l => l.matchedProductId)
+      .filter((id): id is string => !!id && noCategorySet.has(id));
+    if (noCategoryIds.length > 0) {
+      setPendingCategoryProductIds(noCategoryIds);
+      setPendingCategoryValue(data.categories[0]?.name || '');
+    }
+  };
+
+  const onConfirmCategorySelection = () => {
+    if (!pendingCategoryProductIds?.length) return;
+    const inventory = data.inventory.map(p =>
+      pendingCategoryProductIds.includes(p.id) ? { ...p, category: pendingCategoryValue } : p
+    );
+    updateData({ inventory });
+    setPendingCategoryProductIds(null);
   };
 
   const onPost = () => {
@@ -163,7 +181,7 @@ export default function DocumentImports({ data, updateData }: { data: AppData; u
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm space-y-4">
             <h3 className="font-bold text-lg">Постачальника не розпізнано</h3>
-            <p className="text-sm text-neutral-600">Оберіть постачальника та категорію товарів для імпортованого документа.</p>
+            <p className="text-sm text-neutral-600">Оберіть постачальника для імпортованого документа.</p>
             <div>
               <label className="block text-sm font-medium mb-1">Постачальник</label>
               <select
@@ -175,11 +193,24 @@ export default function DocumentImports({ data, updateData }: { data: AppData; u
                 {data.suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
             </div>
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setPendingImport(null)} className="px-4 py-2 rounded-lg border text-sm">Скасувати</button>
+              <button onClick={onConfirmPendingImport} disabled={!pendingSupplier} className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm disabled:opacity-40">Підтвердити</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {pendingCategoryProductIds && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm space-y-4">
+            <h3 className="font-bold text-lg">Оберіть категорію товарів</h3>
+            <p className="text-sm text-neutral-600">Документ створено. Вкажіть категорію для {pendingCategoryProductIds.length} нових товарів із цього імпорту.</p>
             <div>
               <label className="block text-sm font-medium mb-1">Категорія товару</label>
               <select
-                value={pendingCategory}
-                onChange={e => setPendingCategory(e.target.value)}
+                value={pendingCategoryValue}
+                onChange={e => setPendingCategoryValue(e.target.value)}
                 className="w-full border rounded-lg px-3 py-2 text-sm"
               >
                 <option value="">— оберіть —</option>
@@ -187,8 +218,8 @@ export default function DocumentImports({ data, updateData }: { data: AppData; u
               </select>
             </div>
             <div className="flex gap-2 justify-end">
-              <button onClick={() => setPendingImport(null)} className="px-4 py-2 rounded-lg border text-sm">Скасувати</button>
-              <button onClick={onConfirmPendingImport} disabled={!pendingSupplier} className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm disabled:opacity-40">Підтвердити</button>
+              <button onClick={() => setPendingCategoryProductIds(null)} className="px-4 py-2 rounded-lg border text-sm">Пропустити</button>
+              <button onClick={onConfirmCategorySelection} disabled={!pendingCategoryValue} className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm disabled:opacity-40">Підтвердити</button>
             </div>
           </div>
         </div>
