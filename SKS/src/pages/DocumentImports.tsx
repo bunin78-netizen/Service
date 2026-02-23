@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { AppData, ImportJobStatus } from '../types';
-import { ExcelCsvExtractor, MockExtractor, XmlExtractor, createImportJob, createReceiptDraft, deleteImportJob, hashFile, mapImportLine, postReceiptDraft, processImportJob, validateImportLine } from '../services/imports';
+import { ExcelCsvExtractor, MockExtractor, XmlExtractor, createImportJob, createReceiptDraft, deleteImportJob, hashFile, postReceiptDraft, processImportJob, validateImportLine } from '../services/imports';
 
 const STATUS_OPTIONS: { value: '' | ImportJobStatus; label: string }[] = [
   { value: '', label: 'Всі статуси' },
@@ -23,8 +23,7 @@ export default function DocumentImports({ data, updateData }: { data: AppData; u
   const [statusFilter, setStatusFilter] = useState<'' | ImportJobStatus>('');
   const [pendingImport, setPendingImport] = useState<PendingImport | null>(null);
   const [pendingSupplier, setPendingSupplier] = useState('');
-  const [pendingCategoryProductIds, setPendingCategoryProductIds] = useState<string[] | null>(null);
-  const [pendingCategoryValue, setPendingCategoryValue] = useState('');
+
   const pdfExtractor = useMemo(() => new MockExtractor(), []);
   const excelCsvExtractor = useMemo(() => new ExcelCsvExtractor(), []);
   const xmlExtractor = useMemo(() => new XmlExtractor(), []);
@@ -109,35 +108,20 @@ export default function DocumentImports({ data, updateData }: { data: AppData; u
     setPendingImport(null);
   };
 
-  const onMapLine = (lineId: string, productId: string) => {
-    if (!selectedJob) return;
-    const next = mapImportLine(data, selectedJob.id, lineId, productId);
-    updateData({ importJobs: next.importJobs, supplierProductMap: next.supplierProductMap });
-  };
 
   const onCreateDraft = () => {
     if (!selectedJob) return;
     const next = createReceiptDraft(data, selectedJob.id);
     updateData({ receiptDrafts: next.receiptDrafts });
-    // After the document is created, offer category selection for any
-    // products from this import that still have no category assigned
-    const noCategorySet = new Set(data.inventory.filter(p => !p.category).map(p => p.id));
-    const noCategoryIds = selectedJob.lines
-      .map(l => l.matchedProductId)
-      .filter((id): id is string => !!id && noCategorySet.has(id));
-    if (noCategoryIds.length > 0) {
-      setPendingCategoryProductIds(noCategoryIds);
-      setPendingCategoryValue(data.categories[0]?.name || '');
-    }
   };
 
-  const onConfirmCategorySelection = () => {
-    if (!pendingCategoryProductIds?.length) return;
+  const onSetLineCategory = (lineId: string, category: string) => {
+    const line = selectedJob?.lines.find(l => l.id === lineId);
+    if (!line?.matchedProductId) return;
     const inventory = data.inventory.map(p =>
-      pendingCategoryProductIds.includes(p.id) ? { ...p, category: pendingCategoryValue } : p
+      p.id === line.matchedProductId ? { ...p, category } : p
     );
     updateData({ inventory });
-    setPendingCategoryProductIds(null);
   };
 
   const onPost = () => {
@@ -196,30 +180,6 @@ export default function DocumentImports({ data, updateData }: { data: AppData; u
             <div className="flex gap-2 justify-end">
               <button onClick={() => setPendingImport(null)} className="px-4 py-2 rounded-lg border text-sm">Скасувати</button>
               <button onClick={onConfirmPendingImport} disabled={!pendingSupplier} className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm disabled:opacity-40">Підтвердити</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {pendingCategoryProductIds && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm space-y-4">
-            <h3 className="font-bold text-lg">Оберіть категорію товарів</h3>
-            <p className="text-sm text-neutral-600">Документ створено. Вкажіть категорію для {pendingCategoryProductIds.length} нових товарів із цього імпорту.</p>
-            <div>
-              <label className="block text-sm font-medium mb-1">Категорія товару</label>
-              <select
-                value={pendingCategoryValue}
-                onChange={e => setPendingCategoryValue(e.target.value)}
-                className="w-full border rounded-lg px-3 py-2 text-sm"
-              >
-                <option value="">— оберіть —</option>
-                {data.categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
-              </select>
-            </div>
-            <div className="flex gap-2 justify-end">
-              <button onClick={() => setPendingCategoryProductIds(null)} className="px-4 py-2 rounded-lg border text-sm">Пропустити</button>
-              <button onClick={onConfirmCategorySelection} disabled={!pendingCategoryValue} className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm disabled:opacity-40">Підтвердити</button>
             </div>
           </div>
         </div>
@@ -294,7 +254,7 @@ export default function DocumentImports({ data, updateData }: { data: AppData; u
                       <th className="p-2 text-left">Ціна</th>
                       <th className="p-2 text-left">ПДВ</th>
                       <th className="p-2 text-left">Confidence</th>
-                      <th className="p-2 text-left">Товар</th>
+                      <th className="p-2 text-left">Категорія</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -308,9 +268,9 @@ export default function DocumentImports({ data, updateData }: { data: AppData; u
                           <td className="p-2">{(line.vatRate * 100).toFixed(0)}%</td>
                           <td className="p-2">{line.confidence.toFixed(2)}</td>
                           <td className="p-2">
-                            <select className="border rounded p-1" value={line.matchedProductId || ''} onChange={(e) => onMapLine(line.id, e.target.value)}>
-                              <option value="">Не зіставлено</option>
-                              {data.inventory.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                            <select className="border rounded p-1" value={data.inventory.find(p => p.id === line.matchedProductId)?.category || ''} onChange={(e) => onSetLineCategory(line.id, e.target.value)} disabled={!line.matchedProductId}>
+                              <option value="">— оберіть —</option>
+                              {data.categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
                             </select>
                           </td>
                         </tr>
