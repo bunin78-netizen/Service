@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { AppData, Client, Notification } from '../types';
-import { Plus, Search, User, Car, Phone, Mail, Edit2, Trash2, X, Save } from 'lucide-react';
+import { Plus, Search, User, Car, Phone, Mail, Edit2, Trash2, X, Save, BadgePercent, Send } from 'lucide-react';
 import { generateId } from '../store';
 import { format } from 'date-fns';
 import { loadDbExtras } from './Database';
@@ -15,6 +15,9 @@ const emptyClient: Omit<Client, 'id' | 'createdAt'> = {
   name: '',
   phone: '',
   email: '',
+  discountPercent: 0,
+  phoneVerified: false,
+  telegramChatId: '',
   car: {
     make: '',
     model: '',
@@ -23,6 +26,8 @@ const emptyClient: Omit<Client, 'id' | 'createdAt'> = {
     plate: '',
   }
 };
+
+const normalizePhoneForMatch = (phone: string) => phone.replace(/\D/g, '').slice(-10);
 
 export default function Clients({ data, updateData, addNotification }: ClientsProps) {
   const db = loadDbExtras();
@@ -45,6 +50,8 @@ export default function Clients({ data, updateData, addNotification }: ClientsPr
         name: client.name,
         phone: client.phone,
         email: client.email,
+        discountPercent: client.discountPercent || 0,
+        telegramChatId: client.telegramChatId || '',
         car: { ...client.car }
       });
     } else {
@@ -62,9 +69,15 @@ export default function Clients({ data, updateData, addNotification }: ClientsPr
 
     if (editingClient) {
       // Update existing client
+      const phoneChanged = normalizePhoneForMatch(formData.phone) !== normalizePhoneForMatch(editingClient.phone);
+      const sanitizedClient = {
+        ...formData,
+        discountPercent: Math.max(0, Math.min(100, Number(formData.discountPercent || 0))),
+        telegramChatId: phoneChanged ? '' : (editingClient.telegramChatId || ''),
+      };
       const updated = data.clients.map(c => 
         c.id === editingClient.id 
-          ? { ...c, ...formData }
+          ? { ...c, ...sanitizedClient }
           : c
       );
       updateData({ clients: updated });
@@ -73,6 +86,8 @@ export default function Clients({ data, updateData, addNotification }: ClientsPr
       const newClient: Client = {
         id: generateId(),
         ...formData,
+        discountPercent: Math.max(0, Math.min(100, Number(formData.discountPercent || 0))),
+        telegramChatId: '',
         createdAt: format(new Date(), 'yyyy-MM-dd'),
       };
       updateData({ clients: [...data.clients, newClient] });
@@ -127,7 +142,10 @@ export default function Clients({ data, updateData, addNotification }: ClientsPr
                   <User size={24} />
                 </div>
                 <div>
-                  <h4 className="font-bold text-lg leading-tight">{client.name}</h4>
+                  <div className="flex items-center gap-2">
+                    <h4 className="font-bold text-lg leading-tight">{client.name}</h4>
+                    {client.telegramChatId && <Send size={14} className="text-sky-500" title="Клієнт підключений до Telegram бота" />}
+                  </div>
                   <p className="text-xs text-neutral-400">ID: {client.id} • Створено {client.createdAt}</p>
                 </div>
               </div>
@@ -160,6 +178,14 @@ export default function Clients({ data, updateData, addNotification }: ClientsPr
                   <span>{client.email}</span>
                 </div>
               )}
+              <div className="flex items-center gap-2 text-neutral-600 text-sm">
+                <BadgePercent size={16} className="text-neutral-400" />
+                <span>Знижка: <span className="font-semibold">{client.discountPercent || 0}%</span></span>
+              </div>
+              <div className="flex items-center gap-2 text-neutral-600 text-sm">
+                <Send size={16} className={client.telegramChatId ? 'text-sky-500' : 'text-neutral-400'} />
+                <span>{client.telegramChatId ? 'Підключено до Telegram бота' : 'Не підключено до Telegram бота'}</span>
+              </div>
             </div>
 
             <div className="p-4 bg-neutral-50 rounded-xl border border-neutral-100 relative overflow-hidden">
@@ -229,6 +255,30 @@ export default function Clients({ data, updateData, addNotification }: ClientsPr
                     className="w-full p-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#ffcc00]"
                     placeholder="email@example.com"
                   />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-neutral-700 mb-1">Знижка, %</label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={formData.discountPercent || 0}
+                    onChange={(e) => setFormData({ ...formData, discountPercent: Number(e.target.value) })}
+                    className="w-full p-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#ffcc00]"
+                    placeholder="0"
+                  />
+                </div>
+                <div className="col-span-2 p-3 rounded-lg border border-sky-100 bg-sky-50 text-xs text-sky-800">
+                  Telegram Chat ID заповнюється автоматично, коли клієнт надсилає свій номер телефону в Telegram-бот.
+                </div>
+                <div className="col-span-2 flex items-center justify-between rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2">
+                  <span className="text-sm font-medium text-neutral-700">Статус Telegram</span>
+                  <div className="flex items-center gap-2 text-sm">
+                    <Send size={16} className={formData.telegramChatId ? 'text-sky-500' : 'text-neutral-400'} />
+                    <span className={formData.telegramChatId ? 'text-sky-700 font-medium' : 'text-neutral-500'}>
+                      {formData.telegramChatId ? 'Підключено' : 'Не підключено'}
+                    </span>
+                  </div>
                 </div>
               </div>
 

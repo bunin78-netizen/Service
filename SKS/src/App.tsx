@@ -47,6 +47,8 @@ import { sendTelegramNotification } from './pages/Telegram';
 import { sendViberNotification } from './pages/Viber';
 
 const MOBILE_BREAKPOINT = 768;
+const TG_LINK_SYNC_OFFSET_KEY = 'smartkharkov_tg_link_offset';
+const normalizePhoneForMatch = (phone: string) => phone.replace(/\D/g, '').slice(-10);
 
 export function App() {
   const [data, setData] = useState<AppData>(loadData());
@@ -84,6 +86,75 @@ export function App() {
   useEffect(() => {
     saveData(data);
   }, [data]);
+
+  // ── Telegram client auto-link by phone/contact ──────────────────────────────
+  useEffect(() => {
+    const tg = data.telegramSettings;
+    if (!tg?.enabled || !tg.botToken) return;
+
+    let cancelled = false;
+    let inFlight = false;
+
+    const syncClientLinks = async () => {
+      if (cancelled || inFlight) return;
+      inFlight = true;
+      try {
+        const offsetRaw = localStorage.getItem(TG_LINK_SYNC_OFFSET_KEY);
+        const offset = Number(offsetRaw || '0') || 0;
+        const response = await fetch(`https://api.telegram.org/bot${tg.botToken}/getUpdates?offset=${offset}&timeout=0`);
+        const result = await response.json();
+        if (!result?.ok || !Array.isArray(result.result)) return;
+
+        const updates = result.result as Array<any>;
+        if (!updates.length) return;
+
+        const nextOffset = Math.max(...updates.map((u: any) => Number(u.update_id) || 0)) + 1;
+        localStorage.setItem(TG_LINK_SYNC_OFFSET_KEY, String(nextOffset));
+
+        const phoneToChat = new Map<string, string>();
+        for (const upd of updates) {
+          const msg = upd?.message || upd?.edited_message;
+          const phone = msg?.contact?.phone_number as string | undefined;
+          const chatId = msg?.chat?.id;
+          if (!phone || chatId === undefined || chatId === null) continue;
+          const normalizedPhone = normalizePhoneForMatch(phone);
+          if (!normalizedPhone) continue;
+          phoneToChat.set(normalizedPhone, String(chatId));
+        }
+
+        if (!phoneToChat.size || cancelled) return;
+
+        setData(prev => {
+          let changed = false;
+          const clients = prev.clients.map(client => {
+            const chatId = phoneToChat.get(normalizePhoneForMatch(client.phone));
+            if (!chatId || client.telegramChatId === chatId) return client;
+            changed = true;
+            return {
+              ...client,
+              telegramChatId: chatId,
+              phoneVerified: true,
+            };
+          });
+
+          if (!changed) return prev;
+          return { ...prev, clients };
+        });
+      } catch (error) {
+        console.error('Telegram contact sync error:', error);
+      } finally {
+        inFlight = false;
+      }
+    };
+
+    syncClientLinks();
+    const timerId = window.setInterval(syncClientLinks, 20000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(timerId);
+    };
+  }, [data.telegramSettings?.enabled, data.telegramSettings?.botToken]);
 
   // ── Mobile detection ─────────────────────────────────────────────────────────
   useEffect(() => {
