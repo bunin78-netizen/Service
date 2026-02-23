@@ -47,7 +47,7 @@ export default function DocumentImports({ data, updateData }: { data: AppData; u
       const job = createImportJob(data, { filename: file.name, fileHash, filePath: file.name, createdBy: data.currentUserId || 'u1' });
       const withJob: AppData = { ...data, importJobs: [job, ...data.importJobs] };
       const processed = await processImportJob(withJob, job.id, extractor);
-      updateData({ importJobs: processed.importJobs });
+      updateData({ importJobs: processed.importJobs, inventory: processed.inventory, supplierProductMap: processed.supplierProductMap });
       setSelectedJobId(job.id);
     } catch (e) {
       alert(e instanceof Error ? e.message : 'Не вдалося завантажити файл');
