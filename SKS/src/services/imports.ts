@@ -35,14 +35,14 @@ function detectSeparator(firstLine: string): string {
 function mapHeader(h: string): string {
   const s = h.trim().toLowerCase();
   if (/^(назва|найменування|товар|name|опис|description)/.test(s)) return 'name';
-  if (/^(артикул|sku|код постачальника|supplier.?sku|part.?no)/.test(s)) return 'sku';
+  if (/^(артикул|sku|код постачальника|supplier[._\s-]?sku|part[._\s-]?no)/.test(s)) return 'sku';
   if (/^(штрихкод|barcode|ean|upc)/.test(s)) return 'barcode';
   if (/^(кіл|кількість|qty|quantity|кол)/.test(s)) return 'qty';
   if (/^(од|одиниця|unit|уп|упак)/.test(s)) return 'unit';
-  if (/^(ціна\s*(без|нетто|net)|price.?(net|excl)|нетто)/.test(s)) return 'priceNet';
+  if (/^(ціна\s*(без|нетто|net)|price[._\s-]?(net|excl)|нетто)/.test(s)) return 'priceNet';
   if (/^(ціна|price|вартість|cost)/.test(s)) return 'price';
-  if (/^(пдв\s*%|vat\s*%|vat.?rate|ставка пдв)/.test(s)) return 'vatRate';
-  if (/^(сума|разом|total|line.?total|підсумок)/.test(s)) return 'lineTotal';
+  if (/^(пдв\s*%|vat\s*%|vat[._\s-]?rate|ставка пдв)/.test(s)) return 'vatRate';
+  if (/^(сума|разом|total|line[._\s-]?total|підсумок)/.test(s)) return 'lineTotal';
   return s;
 }
 
@@ -69,7 +69,8 @@ function rowsToLines(rows: unknown[][]): ExtractedDocument['lines'] {
     if (qty <= 0) continue;
 
     const vatRateRaw = get('vatRate');
-    const vatRate = vatRateRaw ? parseNum(vatRateRaw) / (parseNum(vatRateRaw) > 1 ? 100 : 1) : 0.2;
+    const vatNum = parseNum(vatRateRaw);
+    const vatRate = vatRateRaw ? vatNum / (vatNum > 1 ? 100 : 1) : 0.2;
 
     let priceNet = parseNum(get('priceNet'));
     if (!priceNet) {
@@ -124,9 +125,108 @@ export class ExcelCsvExtractor implements DocumentExtractor {
   }
 }
 
-/** Parse filenames like Expense_0318580_19.02.2026.pdf/.xlsx/.csv → { docNumber, docDate } */
+/** Get the trimmed text content of the first element matching any of the given tag names */
+function xmlText(parent: Element | Document, ...names: string[]): string {
+  for (const name of names) {
+    const el = parent.querySelector(name)
+      ?? Array.from((parent as Element).children ?? []).find(c => c.tagName.toLowerCase() === name.toLowerCase());
+    if (el?.textContent?.trim()) return el.textContent.trim();
+  }
+  return '';
+}
+
+/** Find repeated item elements within an XML document */
+function findXmlItems(doc: Document): Element[] {
+  const containers = ['items', 'lines', 'rows', 'products', 'body', 'Товари', 'Рядки', 'Позиції', 'InvoiceLines', 'cac:InvoiceLine'];
+  const itemTags = ['item', 'line', 'row', 'product', 'Товар', 'Рядок', 'Позиція', 'InvoiceLine', 'cac:InvoiceLine'];
+  for (const cname of containers) {
+    const container = doc.querySelector(cname);
+    if (container) {
+      for (const itag of itemTags) {
+        const found = Array.from(container.querySelectorAll(itag));
+        if (found.length) return found;
+      }
+      if (container.children.length) return Array.from(container.children);
+    }
+  }
+  for (const itag of itemTags) {
+    const found = Array.from(doc.querySelectorAll(itag));
+    if (found.length) return found;
+  }
+  return [];
+}
+
+/** Extractor for XML supplier invoice files */
+export class XmlExtractor implements DocumentExtractor {
+  async extract(_fileName: string, file?: File): Promise<ExtractedDocument> {
+    if (!file) throw new Error('File object is required for XML extraction');
+
+    const text = await file.text();
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(text, 'application/xml');
+    const parseError = doc.querySelector('parsererror');
+    if (parseError) throw new Error('Невірний XML-файл: ' + (parseError.textContent?.slice(0, 120) ?? '') + ((parseError.textContent?.length ?? 0) > 120 ? '...' : ''));
+
+    const root = doc.documentElement;
+
+    const docNumber = xmlText(root, 'Number', 'DocNumber', 'Номер', 'InvoiceID', 'ID', 'id') || undefined;
+
+    const rawDate = xmlText(root, 'Date', 'Дата', 'InvoiceDate', 'IssueDate', 'date');
+    let docDate: string | undefined;
+    if (rawDate) {
+      // Accept ISO (YYYY-MM-DD) or DD.MM.YYYY
+      if (/^\d{4}-\d{2}-\d{2}/.test(rawDate)) {
+        docDate = rawDate.slice(0, 10);
+      } else if (/^\d{2}\.\d{2}\.\d{4}$/.test(rawDate)) {
+        const [dd, mm, yyyy] = rawDate.split('.');
+        docDate = `${yyyy}-${mm}-${dd}`;
+      }
+    }
+
+    const supplierName = xmlText(root,
+      'SellerName', 'Постачальник', 'SupplierName', 'Seller', 'AccountingSupplierParty',
+      'cac:AccountingSupplierParty', 'supplier', 'Supplier',
+    ) || undefined;
+
+    const items = findXmlItems(doc);
+    const lines: ExtractedDocument['lines'] = [];
+    for (const el of items) {
+      const name = xmlText(el, 'Name', 'Назва', 'Найменування', 'Description', 'cbc:Name', 'cbc:Description', 'Item', 'Товар');
+      if (!name) continue;
+      const qty = parseNum(xmlText(el, 'Qty', 'Quantity', 'Кількість', 'Amount', 'cbc:InvoicedQuantity') || '1');
+      if (qty <= 0) continue;
+      const vatRateRaw = parseNum(xmlText(el, 'VAT', 'VATRate', 'ПДВ', 'VatRate', 'TaxRate', 'cbc:Percent'));
+      const vatRate = vatRateRaw > 1 ? vatRateRaw / 100 : vatRateRaw || 0.2;
+      const priceNetRaw = parseNum(xmlText(el, 'PriceNet', 'PriceExcl', 'ЦінаБезПДВ', 'NetPrice', 'cbc:PriceAmount'));
+      const priceGrossRaw = parseNum(xmlText(el, 'Price', 'Ціна', 'UnitPrice', 'cbc:LineExtensionAmount'));
+      const priceNet = priceNetRaw || (priceGrossRaw ? Number((priceGrossRaw / (1 + vatRate)).toFixed(4)) : 0);
+      const lineTotalRaw = xmlText(el, 'Total', 'Сума', 'LineTotal', 'Amount', 'cbc:LineExtensionAmount');
+      const lineTotal = lineTotalRaw ? parseNum(lineTotalRaw) : undefined;
+      lines.push({
+        name,
+        supplierSku: xmlText(el, 'Article', 'Артикул', 'SKU', 'Code', 'cac:SellersItemIdentification') || undefined,
+        barcode: xmlText(el, 'Barcode', 'Штрихкод', 'EAN', 'UPC') || undefined,
+        qty,
+        unit: xmlText(el, 'Unit', 'Одиниця', 'UOM', 'cbc:unitCode') || 'шт',
+        priceNet,
+        vatRate,
+        lineTotal,
+        confidence: 0.9,
+      });
+    }
+
+    return {
+      supplier: supplierName ? { name: supplierName } : undefined,
+      docNumber,
+      docDate: docDate ?? new Date().toISOString().split('T')[0],
+      lines,
+    };
+  }
+}
+
+/** Parse filenames like Expense_0318580_19.02.2026.pdf/.xlsx/.csv/.xml → { docNumber, docDate } */
 function parseExpenseFilename(fileName: string): { docNumber: string; docDate: string } | null {
-  const base = fileName.replace(/\.(pdf|xlsx?|csv)$/i, '');
+  const base = fileName.replace(/\.(pdf|xlsx?|csv|xml)$/i, '');
   const parts = base.split('_');
   if (parts.length < 3 || parts[0].toLowerCase() !== 'expense') return null;
   const docNumber = parts[1];
@@ -259,7 +359,7 @@ function findMappedProduct(data: AppData, supplierId: string | undefined, line: 
   return exactByName?.id;
 }
 
-export async function processImportJob(data: AppData, jobId: string, extractor: DocumentExtractor): Promise<AppData> {
+export async function processImportJob(data: AppData, jobId: string, extractor: DocumentExtractor, file?: File): Promise<AppData> {
   const jobIndex = data.importJobs.findIndex(j => j.id === jobId);
   if (jobIndex === -1) throw new Error('Import job not found');
   const job = data.importJobs[jobIndex];
@@ -268,7 +368,7 @@ export async function processImportJob(data: AppData, jobId: string, extractor: 
   const newParts: Part[] = [];
   const newMappings: SupplierProductMap[] = [];
   try {
-    const extracted = await extractor.extract(job.sourceFilename);
+    const extracted = await extractor.extract(job.sourceFilename, file);
     const supplierId = extracted.supplier?.supplierId;
     const now = new Date().toISOString();
     const lines = extracted.lines.map(line => normalizeLine(job.id, line)).map(l => {
@@ -404,7 +504,7 @@ export function postReceiptDraft(data: AppData, draftId: string): AppData {
     number: `ІМП-${new Date().getFullYear()}-${Math.floor(Math.random() * 9000 + 1000)}`,
     date: new Date().toISOString().split('T')[0],
     supplierId: draft.supplierId,
-    note: `Імпорт PDF (job ${draft.importJobId})`,
+    note: `Імпорт (job ${draft.importJobId})`,
     status: 'completed' as const,
     createdAt: new Date().toISOString().split('T')[0],
     items: draft.lines.map(l => ({ id: generateId(), partId: l.productId!, name: l.name, quantity: l.qty, price: l.price })),

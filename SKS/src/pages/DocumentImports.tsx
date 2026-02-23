@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { AppData, ImportJobStatus } from '../types';
-import { MockExtractor, createImportJob, createReceiptDraft, deleteImportJob, hashFile, mapImportLine, postReceiptDraft, processImportJob, validateImportLine } from '../services/imports';
+import { ExcelCsvExtractor, MockExtractor, XmlExtractor, createImportJob, createReceiptDraft, deleteImportJob, hashFile, mapImportLine, postReceiptDraft, processImportJob, validateImportLine } from '../services/imports';
 
 const STATUS_OPTIONS: { value: '' | ImportJobStatus; label: string }[] = [
   { value: '', label: 'Всі статуси' },
@@ -17,7 +17,9 @@ export default function DocumentImports({ data, updateData }: { data: AppData; u
   const [statusFilter, setStatusFilter] = useState<'' | ImportJobStatus>('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
-  const extractor = useMemo(() => new MockExtractor(), []);
+  const pdfExtractor = useMemo(() => new MockExtractor(), []);
+  const excelCsvExtractor = useMemo(() => new ExcelCsvExtractor(), []);
+  const xmlExtractor = useMemo(() => new XmlExtractor(), []);
 
   const currentUser = data.users.find(u => u.id === data.currentUserId);
   const isAdmin = currentUser?.role === 'admin';
@@ -43,10 +45,16 @@ export default function DocumentImports({ data, updateData }: { data: AppData; u
     if (!file) return;
     setBusy(true);
     try {
+      const name = file.name.toLowerCase();
+      const extractor = name.endsWith('.xml')
+        ? xmlExtractor
+        : (name.endsWith('.csv') || name.endsWith('.xlsx') || name.endsWith('.xls'))
+          ? excelCsvExtractor
+          : pdfExtractor;
       const fileHash = await hashFile(file);
       const job = createImportJob(data, { filename: file.name, fileHash, filePath: file.name, createdBy: data.currentUserId || 'u1' });
       const withJob: AppData = { ...data, importJobs: [job, ...data.importJobs] };
-      const processed = await processImportJob(withJob, job.id, extractor);
+      const processed = await processImportJob(withJob, job.id, extractor, file);
       updateData({ importJobs: processed.importJobs, inventory: processed.inventory, supplierProductMap: processed.supplierProductMap });
       setSelectedJobId(job.id);
     } catch (e) {
@@ -100,9 +108,9 @@ export default function DocumentImports({ data, updateData }: { data: AppData; u
   return (
     <div className="space-y-6">
       <div className="bg-white p-6 rounded-2xl border shadow-sm">
-        <h2 className="text-xl font-bold mb-3">Імпорт документів постачальника (PDF)</h2>
-        <input type="file" accept="application/pdf" disabled={busy} onChange={(e) => onUpload(e.target.files?.[0])} className="block w-full text-sm" />
-        <p className="text-xs text-neutral-500 mt-2">Для демо використайте файл з назвою: Expense_0318580_19.02.2026.pdf</p>
+        <h2 className="text-xl font-bold mb-3">Імпорт документів постачальника</h2>
+        <input type="file" accept="application/pdf,.xlsx,.xls,.csv,.xml,text/csv,text/xml,application/xml" disabled={busy} onChange={(e) => onUpload(e.target.files?.[0])} className="block w-full text-sm" />
+        <p className="text-xs text-neutral-500 mt-2">Підтримувані формати: PDF, Excel (.xlsx/.xls), CSV, XML. Для демо: Expense_0318580_19.02.2026.pdf</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
