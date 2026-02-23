@@ -4,6 +4,9 @@ export type Client = {
   name: string;
   phone: string;
   email?: string;
+  discountPercent?: number;
+  phoneVerified?: boolean;
+  telegramChatId?: string;
   car: {
     make: string;
     model: string;

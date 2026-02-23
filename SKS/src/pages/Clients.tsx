@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { AppData, Client, Notification } from '../types';
-import { Plus, Search, User, Car, Phone, Mail, Edit2, Trash2, X, Save } from 'lucide-react';
+import { Plus, Search, User, Car, Phone, Mail, Edit2, Trash2, X, Save, BadgePercent, ShieldCheck, MessageCircle } from 'lucide-react';
 import { generateId } from '../store';
 import { format } from 'date-fns';
 import { loadDbExtras } from './Database';
@@ -15,6 +15,9 @@ const emptyClient: Omit<Client, 'id' | 'createdAt'> = {
   name: '',
   phone: '',
   email: '',
+  discountPercent: 0,
+  phoneVerified: false,
+  telegramChatId: '',
   car: {
     make: '',
     model: '',
@@ -45,6 +48,9 @@ export default function Clients({ data, updateData, addNotification }: ClientsPr
         name: client.name,
         phone: client.phone,
         email: client.email,
+        discountPercent: client.discountPercent || 0,
+        phoneVerified: !!client.phoneVerified,
+        telegramChatId: client.telegramChatId || '',
         car: { ...client.car }
       });
     } else {
@@ -62,9 +68,14 @@ export default function Clients({ data, updateData, addNotification }: ClientsPr
 
     if (editingClient) {
       // Update existing client
+      const sanitizedClient = {
+        ...formData,
+        discountPercent: Math.max(0, Math.min(100, Number(formData.discountPercent || 0))),
+        telegramChatId: formData.phoneVerified ? (formData.telegramChatId || '') : '',
+      };
       const updated = data.clients.map(c => 
         c.id === editingClient.id 
-          ? { ...c, ...formData }
+          ? { ...c, ...sanitizedClient }
           : c
       );
       updateData({ clients: updated });
@@ -73,6 +84,8 @@ export default function Clients({ data, updateData, addNotification }: ClientsPr
       const newClient: Client = {
         id: generateId(),
         ...formData,
+        discountPercent: Math.max(0, Math.min(100, Number(formData.discountPercent || 0))),
+        telegramChatId: formData.phoneVerified ? (formData.telegramChatId || '') : '',
         createdAt: format(new Date(), 'yyyy-MM-dd'),
       };
       updateData({ clients: [...data.clients, newClient] });
@@ -160,6 +173,20 @@ export default function Clients({ data, updateData, addNotification }: ClientsPr
                   <span>{client.email}</span>
                 </div>
               )}
+              <div className="flex items-center gap-2 text-neutral-600 text-sm">
+                <BadgePercent size={16} className="text-neutral-400" />
+                <span>Знижка: <span className="font-semibold">{client.discountPercent || 0}%</span></span>
+              </div>
+              <div className="flex items-center gap-2 text-neutral-600 text-sm">
+                <ShieldCheck size={16} className={client.phoneVerified ? 'text-green-500' : 'text-neutral-400'} />
+                <span>{client.phoneVerified ? 'Телефон авторизовано' : 'Телефон не авторизовано'}</span>
+              </div>
+              {client.telegramChatId && (
+                <div className="flex items-center gap-2 text-neutral-600 text-sm">
+                  <MessageCircle size={16} className="text-neutral-400" />
+                  <span className="font-mono text-xs">Chat ID: {client.telegramChatId}</span>
+                </div>
+              )}
             </div>
 
             <div className="p-4 bg-neutral-50 rounded-xl border border-neutral-100 relative overflow-hidden">
@@ -228,6 +255,39 @@ export default function Clients({ data, updateData, addNotification }: ClientsPr
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                     className="w-full p-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#ffcc00]"
                     placeholder="email@example.com"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-neutral-700 mb-1">Знижка, %</label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={formData.discountPercent || 0}
+                    onChange={(e) => setFormData({ ...formData, discountPercent: Number(e.target.value) })}
+                    className="w-full p-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#ffcc00]"
+                    placeholder="0"
+                  />
+                </div>
+                <div className="col-span-2 flex items-center gap-2">
+                  <input
+                    id="phoneVerified"
+                    type="checkbox"
+                    checked={!!formData.phoneVerified}
+                    onChange={(e) => setFormData({ ...formData, phoneVerified: e.target.checked, telegramChatId: e.target.checked ? formData.telegramChatId : '' })}
+                    className="w-4 h-4"
+                  />
+                  <label htmlFor="phoneVerified" className="text-sm font-medium text-neutral-700">Телефон авторизовано</label>
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium text-neutral-700 mb-1">Telegram Chat ID</label>
+                  <input
+                    type="text"
+                    value={formData.telegramChatId || ''}
+                    onChange={(e) => setFormData({ ...formData, telegramChatId: e.target.value })}
+                    className="w-full p-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#ffcc00] font-mono"
+                    placeholder="Наприклад: 123456789"
+                    disabled={!formData.phoneVerified}
                   />
                 </div>
               </div>

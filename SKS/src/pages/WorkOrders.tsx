@@ -110,6 +110,9 @@ const emptyOrderForm = (): OrderForm => ({
 
 const emptyQuickClientForm = (): Omit<Client, 'id' | 'createdAt'> => ({
   name: '', phone: '', email: '',
+  discountPercent: 0,
+  phoneVerified: false,
+  telegramChatId: '',
   car: { make: '', model: '', year: new Date().getFullYear(), vin: '', plate: '' }
 });
 
@@ -152,7 +155,10 @@ export default function WorkOrders({ data, updateData, addNotification, openDiag
   const calcTotal = (form: OrderForm) => {
     const s = form.services.reduce((acc, s) => acc + (s.price || 0), 0);
     const p = form.parts.reduce((acc, p) => acc + ((p.price || 0) * (p.quantity || 0)), 0);
-    return s + p;
+    const subtotal = s + p;
+    const discountPercent = data.clients.find(c => c.id === form.clientId)?.discountPercent || 0;
+    const discountAmount = subtotal * (discountPercent / 100);
+    return Math.max(0, subtotal - discountAmount);
   };
 
   // ── Create Order ─────────────────────────────────────────────────────────
@@ -683,6 +689,7 @@ export default function WorkOrders({ data, updateData, addNotification, openDiag
                 <div className="flex flex-wrap gap-x-4 gap-y-0.5">
                   <span className="font-bold text-neutral-800">{selectedClient.car.make} {selectedClient.car.model} ({selectedClient.car.year})</span>
                   <span className="font-mono text-neutral-600">{selectedClient.car.plate}</span>
+                  <span className="text-neutral-700">Знижка: {selectedClient.discountPercent || 0}%</span>
                   {selectedClient.car.vin && <span className="font-mono text-neutral-400 text-xs">VIN: {selectedClient.car.vin}</span>}
                 </div>
               </div>
@@ -882,8 +889,25 @@ export default function WorkOrders({ data, updateData, addNotification, openDiag
         </div>
 
         <div className="p-5 border-t bg-neutral-50 flex items-center justify-between shrink-0">
-          <div className="text-lg font-bold">
-            Всього: <span className="text-[#ffcc00]">{calcTotal(orderForm).toLocaleString()} ₴</span>
+          <div>
+            {(() => {
+              const servicesTotal = orderForm.services.reduce((acc, s) => acc + (s.price || 0), 0);
+              const partsTotal = orderForm.parts.reduce((acc, p) => acc + ((p.price || 0) * (p.quantity || 0)), 0);
+              const subtotal = servicesTotal + partsTotal;
+              const discountPercent = data.clients.find(c => c.id === orderForm.clientId)?.discountPercent || 0;
+              const discountAmount = subtotal * (discountPercent / 100);
+
+              return (
+                <>
+                  <div className="text-xs text-neutral-500">
+                    Підсумок: {subtotal.toLocaleString()} ₴{discountPercent > 0 ? ` · Знижка ${discountPercent}% (-${discountAmount.toLocaleString()} ₴)` : ''}
+                  </div>
+                  <div className="text-lg font-bold">
+                    Всього: <span className="text-[#ffcc00]">{calcTotal(orderForm).toLocaleString()} ₴</span>
+                  </div>
+                </>
+              );
+            })()}
           </div>
           <div className="flex gap-3">
             <button onClick={() => setActiveModal(null)} className="px-5 py-2 rounded-lg text-neutral-600 hover:bg-neutral-200 font-medium">
