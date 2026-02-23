@@ -9,7 +9,7 @@ import {
 import { format } from 'date-fns';
 import { generateId, generateOrderId } from '../store';
 import { loadDbExtras } from './Database';
-import { sendTelegramReceipt } from './Telegram';
+import { sendTelegramReceipt, sendTelegramWorkOrderDocument } from './Telegram';
 
 interface WorkOrdersProps {
   data: AppData;
@@ -130,6 +130,7 @@ export default function WorkOrders({ data, updateData, addNotification, openDiag
   const [showAddClientModal, setShowAddClientModal] = useState(false);
   const [quickClientForm, setQuickClientForm] = useState<Omit<Client, 'id' | 'createdAt'>>(emptyQuickClientForm());
   const [receiptSendStatus, setReceiptSendStatus] = useState<Record<string, 'idle' | 'loading' | 'success' | 'error'>>({});
+  const [docSendStatus, setDocSendStatus] = useState<Record<string, 'idle' | 'loading' | 'success' | 'error'>>({});
 
   // ── Filtered orders ──────────────────────────────────────────────────────
   const filteredOrders = useMemo(() => {
@@ -285,6 +286,34 @@ export default function WorkOrders({ data, updateData, addNotification, openDiag
     });
     setReceiptSendStatus(s => ({ ...s, [order.id]: ok ? 'success' : 'error' }));
     setTimeout(() => setReceiptSendStatus(s => ({ ...s, [order.id]: 'idle' })), 4000);
+  };
+
+  // ── Send Work Order Document via Telegram ─────────────────────────────────
+  const handleSendTelegramDocument = async (order: WorkOrder) => {
+    const tg = data.telegramSettings;
+    if (!tg?.enabled || !tg.sendDocuments) return;
+    setDocSendStatus(s => ({ ...s, [order.id]: 'loading' }));
+    const client = data.clients.find(c => c.id === order.clientId);
+    const master = data.employees.find(e => e.id === order.masterId);
+    const cs = data.companySettings;
+    const ok = await sendTelegramWorkOrderDocument(tg, {
+      orderId: order.id,
+      clientName: client?.name || '-',
+      carInfo: client?.car ? `${client.car.make} ${client.car.model} (${client.car.year}) ${client.car.plate}` : '-',
+      date: format(new Date(order.date), 'dd.MM.yyyy'),
+      masterName: master?.name || '-',
+      services: order.services.map(s => ({ name: s.name, price: s.price, hours: s.hours })),
+      parts: order.parts.map(p => {
+        const part = data.inventory.find(inv => inv.id === p.partId);
+        return { name: part?.name || 'Запчастина', quantity: p.quantity, price: p.price };
+      }),
+      total: order.total,
+      companyName: cs.name,
+      companyPhone: cs.phone,
+      companyAddress: cs.address,
+    });
+    setDocSendStatus(s => ({ ...s, [order.id]: ok ? 'success' : 'error' }));
+    setTimeout(() => setDocSendStatus(s => ({ ...s, [order.id]: 'idle' })), 4000);
   };
 
   // ── Restore Cancelled ─────────────────────────────────────────────────────
@@ -1090,6 +1119,29 @@ export default function WorkOrders({ data, updateData, addNotification, openDiag
                             <Building size={18} /> Б/Н
                           </button>
                         </div>
+                        {data.telegramSettings?.enabled && data.telegramSettings?.sendDocuments && order.status === 'Completed' && (
+                          <button
+                            onClick={() => handleSendTelegramDocument(order)}
+                            disabled={docSendStatus[order.id] === 'loading'}
+                            className={`mt-2 w-full flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-bold transition-colors ${
+                              docSendStatus[order.id] === 'success'
+                                ? 'bg-green-100 text-green-700'
+                                : docSendStatus[order.id] === 'error'
+                                ? 'bg-red-100 text-red-700'
+                                : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100'
+                            } disabled:opacity-50`}
+                          >
+                            {docSendStatus[order.id] === 'loading' ? (
+                              <><Loader size={14} className="animate-spin" /> Відправка...</>
+                            ) : docSendStatus[order.id] === 'success' ? (
+                              <><CheckCircle size={14} /> Акт відправлено!</>
+                            ) : docSendStatus[order.id] === 'error' ? (
+                              <><AlertTriangle size={14} /> Помилка відправки</>
+                            ) : (
+                              <><FileText size={14} /> Надіслати акт в Telegram</>
+                            )}
+                          </button>
+                        )}
                       </div>
                     )}
 
@@ -1125,6 +1177,29 @@ export default function WorkOrders({ data, updateData, addNotification, openDiag
                               <><AlertTriangle size={14} /> Помилка відправки</>
                             ) : (
                               <><Send size={14} /> Надіслати чек в Telegram</>
+                            )}
+                          </button>
+                        )}
+                        {data.telegramSettings?.enabled && data.telegramSettings?.sendDocuments && order.status === 'Completed' && (
+                          <button
+                            onClick={() => handleSendTelegramDocument(order)}
+                            disabled={docSendStatus[order.id] === 'loading'}
+                            className={`mt-2 w-full flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-bold transition-colors ${
+                              docSendStatus[order.id] === 'success'
+                                ? 'bg-green-100 text-green-700'
+                                : docSendStatus[order.id] === 'error'
+                                ? 'bg-red-100 text-red-700'
+                                : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100'
+                            } disabled:opacity-50`}
+                          >
+                            {docSendStatus[order.id] === 'loading' ? (
+                              <><Loader size={14} className="animate-spin" /> Відправка...</>
+                            ) : docSendStatus[order.id] === 'success' ? (
+                              <><CheckCircle size={14} /> Акт відправлено!</>
+                            ) : docSendStatus[order.id] === 'error' ? (
+                              <><AlertTriangle size={14} /> Помилка відправки</>
+                            ) : (
+                              <><FileText size={14} /> Надіслати акт в Telegram</>
                             )}
                           </button>
                         )}

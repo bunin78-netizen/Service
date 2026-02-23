@@ -142,6 +142,8 @@ export type TelegramSettings = {
   notifyPaymentReceived: boolean;
   notifyNewClient: boolean;
   sendReceipts: boolean;
+  sendFiscalReceipts: boolean;
+  sendDocuments: boolean;
   welcomeMessage: string;
 };
 

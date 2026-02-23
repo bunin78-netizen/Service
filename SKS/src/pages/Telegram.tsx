@@ -18,6 +18,8 @@ export default function Telegram({ data, onSave }: Props) {
     notifyPaymentReceived: true,
     notifyNewClient: true,
     sendReceipts: false,
+    sendFiscalReceipts: false,
+    sendDocuments: false,
     welcomeMessage: 'Вітаємо в SmartKharkov! 🚗',
   });
   const [testStatus, setTestStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
@@ -321,6 +323,38 @@ export default function Telegram({ data, onSave }: Props) {
                 className="w-5 h-5 text-yellow-500 rounded focus:ring-yellow-500"
               />
             </label>
+
+            <label className="flex items-center justify-between p-4 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100">
+              <div className="flex items-center gap-3">
+                <FileText className="w-5 h-5 text-green-600" />
+                <div>
+                  <span className="font-medium">Відправка фіскальних чеків</span>
+                  <p className="text-xs text-gray-500">Надсилати фіскальний чек у Telegram після фіскалізації</p>
+                </div>
+              </div>
+              <input
+                type="checkbox"
+                checked={settings.sendFiscalReceipts}
+                onChange={(e) => updateSettings({ ...settings, sendFiscalReceipts: e.target.checked })}
+                className="w-5 h-5 text-yellow-500 rounded focus:ring-yellow-500"
+              />
+            </label>
+
+            <label className="flex items-center justify-between p-4 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100">
+              <div className="flex items-center gap-3">
+                <FileText className="w-5 h-5 text-blue-600" />
+                <div>
+                  <span className="font-medium">Відправка документів клієнтам</span>
+                  <p className="text-xs text-gray-500">Надсилати акт виконаних робіт у Telegram</p>
+                </div>
+              </div>
+              <input
+                type="checkbox"
+                checked={settings.sendDocuments}
+                onChange={(e) => updateSettings({ ...settings, sendDocuments: e.target.checked })}
+                className="w-5 h-5 text-yellow-500 rounded focus:ring-yellow-500"
+              />
+            </label>
           </div>
         </div>
       </div>
@@ -361,6 +395,10 @@ export default function Telegram({ data, onSave }: Props) {
             <div className="p-3 bg-gray-50 rounded-lg">
               <code className="text-blue-600 font-mono">/receipt [номер замовлення]</code>
               <p className="text-sm text-gray-600 mt-1">Отримати чек по замовленню</p>
+            </div>
+            <div className="p-3 bg-gray-50 rounded-lg">
+              <code className="text-blue-600 font-mono">/document [номер замовлення]</code>
+              <p className="text-sm text-gray-600 mt-1">Отримати акт виконаних робіт</p>
             </div>
           </div>
         </div>
@@ -587,6 +625,166 @@ export async function sendTelegramReceipt(
     return result.ok;
   } catch (error) {
     console.error('Telegram receipt send error:', error);
+    return false;
+  }
+}
+
+// Export function to send fiscal receipts via Telegram after fiscalization
+export async function sendTelegramFiscalReceipt(
+  settings: TelegramSettings,
+  receipt: {
+    orderId: string;
+    clientName: string;
+    amount: number;
+    paymentType: 'Cash' | 'Card' | 'Bank';
+    fiscalNumber: string;
+    checkNumber: string;
+    qrCode: string;
+    dateTime: string;
+    provider: string;
+    cashier: string;
+    companyName: string;
+    companyAddress: string;
+    edrpou: string;
+    items: { name: string; qty: number; price: number }[];
+  },
+  chatId?: string
+): Promise<boolean> {
+  if (!settings.enabled || !settings.botToken) return false;
+  if (!settings.sendFiscalReceipts) return false;
+
+  const targetChatId = chatId || settings.chatId;
+  if (!targetChatId) return false;
+
+  const payLabel =
+    receipt.paymentType === 'Cash' ? 'Готівка 💵' :
+    receipt.paymentType === 'Card' ? 'Карта 💳' : 'Безготівковий 🏦';
+
+  const dt = new Date(receipt.dateTime);
+  const dateStr = dt.toLocaleDateString('uk-UA');
+  const timeStr = dt.toLocaleTimeString('uk-UA');
+
+  const itemLines = receipt.items
+    .map(i => `  • ${i.name} ×${i.qty} — ${(i.qty * i.price).toLocaleString()} ₴`)
+    .join('\n');
+
+  const message = [
+    `🏛️ *ФІСКАЛЬНИЙ ЧЕК — ${receipt.companyName}*`,
+    `${receipt.companyAddress}`,
+    `ЄДРПОУ: ${receipt.edrpou}`,
+    ``,
+    `📋 Замовлення: *${receipt.orderId}*`,
+    `👤 Клієнт: ${receipt.clientName}`,
+    `📅 Дата: ${dateStr}  🕐 ${timeStr}`,
+    `👷 Касир: ${receipt.cashier}`,
+    ``,
+    itemLines && `*Позиції:*\n${itemLines}`,
+    ``,
+    `💰 *СУМА: ${receipt.amount.toLocaleString()} ₴*`,
+    `💳 Спосіб оплати: ${payLabel}`,
+    ``,
+    `🔒 ФН чеку: \`${receipt.fiscalNumber}\``,
+    `№ чеку: ${receipt.checkNumber}`,
+    `📡 Провайдер: ${receipt.provider}`,
+    ``,
+    `🔗 [Перевірити чек на cabinet.tax.gov.ua](${receipt.qrCode})`,
+    ``,
+    `✅ *Фіскалізовано. Дякуємо за звернення!*`,
+  ]
+    .filter(Boolean)
+    .join('\n');
+
+  try {
+    const response = await fetch(
+      `https://api.telegram.org/bot${settings.botToken}/sendMessage`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: targetChatId,
+          text: message,
+          parse_mode: 'Markdown',
+          disable_web_page_preview: false,
+        }),
+      }
+    );
+    const result = await response.json();
+    return result.ok;
+  } catch (error) {
+    console.error('Telegram fiscal receipt send error:', error);
+    return false;
+  }
+}
+
+// Export function to send work order document (act) to client via Telegram
+export async function sendTelegramWorkOrderDocument(
+  settings: TelegramSettings,
+  doc: {
+    orderId: string;
+    clientName: string;
+    carInfo: string;
+    date: string;
+    masterName: string;
+    services: { name: string; price: number; hours: number }[];
+    parts: { name: string; quantity: number; price: number }[];
+    total: number;
+    companyName: string;
+    companyPhone: string;
+    companyAddress: string;
+  },
+  chatId?: string
+): Promise<boolean> {
+  if (!settings.enabled || !settings.botToken) return false;
+  if (!settings.sendDocuments) return false;
+
+  const targetChatId = chatId || settings.chatId;
+  if (!targetChatId) return false;
+
+  const serviceLines = doc.services
+    .map(s => `  • ${s.name} — ${s.price.toLocaleString()} ₴${s.hours ? ` (${s.hours} год)` : ''}`)
+    .join('\n');
+  const partLines = doc.parts
+    .map(p => `  • ${p.name} ×${p.quantity} — ${(p.price * p.quantity).toLocaleString()} ₴`)
+    .join('\n');
+
+  const message = [
+    `📄 *АКТ ВИКОНАНИХ РОБІТ*`,
+    `🔧 ${doc.companyName}`,
+    `📍 ${doc.companyAddress}  📞 ${doc.companyPhone}`,
+    ``,
+    `📋 Замовлення: *${doc.orderId}*`,
+    `👤 Клієнт: ${doc.clientName}`,
+    `🚗 Авто: ${doc.carInfo}`,
+    `📅 Дата: ${doc.date}`,
+    `👷 Майстер: ${doc.masterName}`,
+    ``,
+    serviceLines && `*Роботи:*\n${serviceLines}`,
+    partLines && `*Запчастини:*\n${partLines}`,
+    ``,
+    `💰 *Загальна сума: ${doc.total.toLocaleString()} ₴*`,
+    ``,
+    `✅ Роботи виконано. Дякуємо за звернення до ${doc.companyName}!`,
+  ]
+    .filter(Boolean)
+    .join('\n');
+
+  try {
+    const response = await fetch(
+      `https://api.telegram.org/bot${settings.botToken}/sendMessage`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: targetChatId,
+          text: message,
+          parse_mode: 'Markdown',
+        }),
+      }
+    );
+    const result = await response.json();
+    return result.ok;
+  } catch (error) {
+    console.error('Telegram work order document send error:', error);
     return false;
   }
 }
