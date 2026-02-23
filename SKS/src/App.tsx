@@ -21,6 +21,7 @@ import {
   Receipt,
   ChevronDown,
   MessageCircle,
+  MoreHorizontal,
 } from 'lucide-react';
 import { loadData, saveData } from './store';
 import { AppData, Notification } from './types';
@@ -280,6 +281,14 @@ export function App() {
     }
   };
 
+  // ── Mobile bottom nav items (most important tabs) ───────────────────────────
+  const mobileBottomNav = [
+    ...(!isMaster ? [{ id: 'dashboard', label: 'Панель', icon: LayoutDashboard }] : []),
+    { id: 'workorders', label: 'Замовлення', icon: Wrench },
+    { id: 'clients', label: 'Клієнти', icon: Users },
+    { id: 'inventory', label: 'Склад', icon: Package },
+  ];
+
   return (
     <div className="flex h-screen bg-neutral-50 text-neutral-900 font-sans overflow-hidden">
       {/* ── Mobile sidebar backdrop ──────────────────────────────────────────── */}
@@ -384,7 +393,7 @@ export function App() {
 
               {/* Notification dropdown */}
               {showNotifications && (
-                <div className="absolute right-0 top-11 w-80 bg-white rounded-xl shadow-2xl border z-50 overflow-hidden">
+                <div className="fixed md:absolute right-2 md:right-0 top-14 md:top-11 left-2 md:left-auto md:w-80 bg-white rounded-xl shadow-2xl border z-50 overflow-hidden">
                   <div className="p-3 border-b flex items-center justify-between bg-neutral-50">
                     <h3 className="font-bold text-sm">
                       Сповіщення
@@ -458,7 +467,7 @@ export function App() {
 
               {/* User dropdown */}
               {showUserMenu && (
-                <div className="absolute right-0 top-12 w-64 bg-white rounded-xl shadow-2xl border z-50 overflow-hidden">
+                <div className="fixed md:absolute right-2 md:right-0 top-14 md:top-12 left-2 md:left-auto md:w-64 bg-white rounded-xl shadow-2xl border z-50 overflow-hidden">
                   {/* Profile header */}
                   <div className="p-4 bg-neutral-900 text-white">
                     <div className="flex items-center gap-3">
@@ -550,10 +559,37 @@ export function App() {
         </header>
 
         {/* Content area */}
-        <div className="flex-1 overflow-y-auto p-5">
+        <div className="flex-1 overflow-y-auto p-3 md:p-5 pb-20 md:pb-5">
           {renderContent()}
         </div>
       </main>
+
+      {/* ── Mobile Bottom Navigation ───────────────────────────────────────────── */}
+      {isMobile && (
+        <nav className="fixed bottom-0 left-0 right-0 z-30 bg-white border-t border-neutral-200 flex items-stretch" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+          {mobileBottomNav.map(item => (
+            <button
+              key={item.id}
+              onClick={() => setActiveTab(item.id)}
+              className={`flex-1 flex flex-col items-center justify-center py-2 gap-0.5 transition-colors text-[10px] font-semibold ${
+                activeTab === item.id
+                  ? 'text-[#b38f00] border-t-2 border-[#ffcc00]'
+                  : 'text-neutral-400'
+              }`}
+            >
+              <item.icon size={20} />
+              <span>{item.label}</span>
+            </button>
+          ))}
+          <button
+            onClick={() => setIsSidebarOpen(true)}
+            className="flex-1 flex flex-col items-center justify-center py-2 gap-0.5 text-neutral-400 text-[10px] font-semibold"
+          >
+            <MoreHorizontal size={20} />
+            <span>Більше</span>
+          </button>
+        </nav>
+      )}
 
       {/* Click outside overlays */}
       {(showNotifications || showUserMenu) && (
