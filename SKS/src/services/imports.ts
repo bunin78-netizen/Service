@@ -1,4 +1,4 @@
-import { AppData, ImportJob, ImportLine, ReceiptDraft, SupplierProductMap } from '../types';
+import { AppData, ImportJob, ImportLine, Part, ReceiptDraft, SupplierProductMap } from '../types';
 import { generateId } from '../store';
 
 export type ExtractedDocument = {
@@ -164,17 +164,39 @@ export async function processImportJob(data: AppData, jobId: string, extractor: 
   const job = data.importJobs[jobIndex];
 
   let updatedJob: ImportJob;
+  const newParts: Part[] = [];
+  const newMappings: SupplierProductMap[] = [];
   try {
     const extracted = await extractor.extract(job.sourceFilename);
-    const lines = extracted.lines.map(line => normalizeLine(job.id, line)).map(l => ({
-      ...l,
-      matchedProductId: findMappedProduct(data, extracted.supplier?.supplierId, l),
-    }));
+    const supplierId = extracted.supplier?.supplierId;
+    const now = new Date().toISOString();
+    const lines = extracted.lines.map(line => normalizeLine(job.id, line)).map(l => {
+      const matchedProductId = findMappedProduct(data, supplierId, l);
+      if (!matchedProductId) {
+        const newPart: Part = {
+          id: generateId(),
+          sku: l.supplierSkuRaw || l.barcodeRaw || `AUTO-${generateId()}`,
+          name: l.nameRaw || 'Новий товар',
+          category: '',
+          purchasePrice: l.priceNet,
+          salePrice: l.priceGross,
+          stock: 0,
+          minStock: 0,
+          supplierId: supplierId || '',
+        };
+        newParts.push(newPart);
+        if (supplierId && (l.supplierSkuRaw || l.barcodeRaw)) {
+          newMappings.push({ supplierId, supplierSku: l.supplierSkuRaw, barcode: l.barcodeRaw, productId: newPart.id, updatedAt: now });
+        }
+        return { ...l, matchedProductId: newPart.id };
+      }
+      return { ...l, matchedProductId };
+    });
 
     updatedJob = {
       ...job,
       status: 'DONE',
-      supplierId: extracted.supplier?.supplierId,
+      supplierId,
       docNumber: extracted.docNumber,
       docDate: extracted.docDate,
       rawExtractionJson: extracted,
@@ -192,7 +214,12 @@ export async function processImportJob(data: AppData, jobId: string, extractor: 
 
   const importJobs = [...data.importJobs];
   importJobs[jobIndex] = updatedJob;
-  return { ...data, importJobs };
+  return {
+    ...data,
+    importJobs,
+    inventory: [...data.inventory, ...newParts],
+    supplierProductMap: [...data.supplierProductMap, ...newMappings],
+  };
 }
 
 export function mapImportLine(data: AppData, jobId: string, importLineId: string, productId: string): AppData {
