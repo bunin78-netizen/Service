@@ -562,8 +562,8 @@ export default function WorkOrders({ data, updateData, addNotification, openDiag
 
   // ── Order Form Modal ──────────────────────────────────────────────────────
   const renderOrderModal = (mode: 'create' | 'edit') => (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl w-full max-w-3xl shadow-2xl overflow-hidden max-h-[95vh] flex flex-col">
+    <div className="fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-50 sm:p-4">
+      <div className="bg-white sm:rounded-2xl w-full max-w-3xl shadow-2xl overflow-hidden max-h-[95vh] flex flex-col rounded-t-2xl">
         <div className="p-5 border-b bg-neutral-50 flex items-center justify-between shrink-0">
           <h3 className="font-bold text-lg flex items-center gap-2">
             <FileText className="text-[#ffcc00]" size={20} />
@@ -574,9 +574,9 @@ export default function WorkOrders({ data, updateData, addNotification, openDiag
           </button>
         </div>
 
-        <div className="p-6 space-y-5 overflow-y-auto flex-1">
+        <div className="p-4 sm:p-6 space-y-5 overflow-y-auto flex-1">
           {/* Client & Master */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-bold text-neutral-600 mb-1">Клієнт *</label>
               <div className="flex gap-2">
@@ -656,69 +656,69 @@ export default function WorkOrders({ data, updateData, addNotification, openDiag
             </div>
             <div className="space-y-2">
               {orderForm.services.map((service, idx) => (
-                <div key={service.id} className="flex gap-2 items-start">
-                  <div className="flex-1 relative">
-                    <div className="flex gap-2">
-                      <div className="flex-1 relative">
-                        <input
-                          type="text"
-                          placeholder="Назва роботи (або оберіть з бази)"
-                          value={service.name}
-                          onChange={e => updateService(idx, 'name', e.target.value)}
-                          className="w-full p-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#ffcc00] text-sm"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowNormsDropdown(showNormsDropdown === idx ? null : idx)}
-                          className="absolute right-2 top-2 text-neutral-400 hover:text-[#ffcc00]"
-                          title="Обрати з бази норм"
-                        >
-                          <ClipboardList size={16} />
-                        </button>
-                        {showNormsDropdown === idx && (
-                          <div className="absolute top-10 left-0 right-0 z-10 bg-white border rounded-xl shadow-xl max-h-48 overflow-y-auto">
-                            {db.workNorms.map(norm => (
-                              <button
-                                key={norm.id}
-                                onClick={() => addNormToService(norm.id, idx)}
-                                className="w-full text-left px-3 py-2 hover:bg-[#ffcc00]/20 text-sm flex justify-between items-center"
-                              >
-                                <span>{norm.name}</span>
-                                <span className="text-neutral-500 text-xs ml-2">{norm.hours} год · {norm.price} ₴</span>
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
+                <div key={service.id} className="p-2 border rounded-lg space-y-2">
+                  <div className="flex gap-2 items-center">
+                    <div className="flex-1 relative">
                       <input
-                        type="number"
-                        placeholder="Год"
-                        value={service.hours || ''}
-                        onChange={e => updateService(idx, 'hours', Number(e.target.value))}
-                        className="w-16 p-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#ffcc00] text-sm"
-                        title="Кількість годин"
+                        type="text"
+                        placeholder="Назва роботи (або оберіть з бази)"
+                        value={service.name}
+                        onChange={e => updateService(idx, 'name', e.target.value)}
+                        className="w-full p-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#ffcc00] text-sm pr-8"
                       />
-                      <input
-                        type="number"
-                        placeholder="Ціна ₴"
-                        value={service.price || ''}
-                        onChange={e => updateService(idx, 'price', Number(e.target.value))}
-                        className="w-24 p-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#ffcc00] text-sm"
-                      />
-                      <select
-                        value={service.masterId}
-                        onChange={e => updateService(idx, 'masterId', e.target.value)}
-                        className="w-36 p-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#ffcc00] text-xs"
+                      <button
+                        type="button"
+                        onClick={() => setShowNormsDropdown(showNormsDropdown === idx ? null : idx)}
+                        className="absolute right-2 top-2 text-neutral-400 hover:text-[#ffcc00]"
+                        title="Обрати з бази норм"
                       >
-                        <option value="">Майстер</option>
-                        {data.employees.filter(e => e.role === 'Master').map(e => (
-                          <option key={e.id} value={e.id}>{e.name}</option>
-                        ))}
-                      </select>
-                      <button onClick={() => removeService(idx)} className="p-2 text-red-400 hover:text-red-600">
-                        <X size={16} />
+                        <ClipboardList size={16} />
                       </button>
+                      {showNormsDropdown === idx && (
+                        <div className="absolute top-10 left-0 right-0 z-10 bg-white border rounded-xl shadow-xl max-h-48 overflow-y-auto">
+                          {db.workNorms.map(norm => (
+                            <button
+                              key={norm.id}
+                              onClick={() => addNormToService(norm.id, idx)}
+                              className="w-full text-left px-3 py-2 hover:bg-[#ffcc00]/20 text-sm flex justify-between items-center"
+                            >
+                              <span>{norm.name}</span>
+                              <span className="text-neutral-500 text-xs ml-2">{norm.hours} год · {norm.price} ₴</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
+                    <button onClick={() => removeService(idx)} className="p-2 text-red-400 hover:text-red-600 shrink-0">
+                      <X size={16} />
+                    </button>
+                  </div>
+                  <div className="flex gap-2 flex-wrap">
+                    <input
+                      type="number"
+                      placeholder="Год"
+                      value={service.hours || ''}
+                      onChange={e => updateService(idx, 'hours', Number(e.target.value))}
+                      className="w-20 p-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#ffcc00] text-sm"
+                      title="Кількість годин"
+                    />
+                    <input
+                      type="number"
+                      placeholder="Ціна ₴"
+                      value={service.price || ''}
+                      onChange={e => updateService(idx, 'price', Number(e.target.value))}
+                      className="w-28 p-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#ffcc00] text-sm"
+                    />
+                    <select
+                      value={service.masterId}
+                      onChange={e => updateService(idx, 'masterId', e.target.value)}
+                      className="flex-1 min-w-[120px] p-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#ffcc00] text-xs"
+                    >
+                      <option value="">Майстер</option>
+                      {data.employees.filter(e => e.role === 'Master').map(e => (
+                        <option key={e.id} value={e.id}>{e.name}</option>
+                      ))}
+                    </select>
                   </div>
                 </div>
               ))}
@@ -739,42 +739,46 @@ export default function WorkOrders({ data, updateData, addNotification, openDiag
             </div>
             <div className="space-y-2">
               {orderForm.parts.map((part, idx) => (
-                <div key={part.id} className="flex gap-2 items-center">
-                  <select
-                    value={part.partId}
-                    onChange={e => updatePart(idx, 'partId', e.target.value)}
-                    className="flex-1 p-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#ffcc00] text-sm"
-                  >
-                    <option value="">Оберіть запчастину...</option>
-                    {data.inventory.filter(p => p.stock > 0).map(p => (
-                      <option key={p.id} value={p.id}>
-                        {p.name} (є: {p.stock} шт) — {p.salePrice} ₴
-                      </option>
-                    ))}
-                  </select>
-                  <input
-                    type="number"
-                    min={0}
-                    value={part.price || ''}
-                    onChange={e => updatePart(idx, 'price', Number(e.target.value))}
-                    className="w-24 p-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#ffcc00] text-sm"
-                    placeholder="Ціна ₴"
-                    title="Ціна за одиницю"
-                  />
-                  <input
-                    type="number"
-                    min={1}
-                    value={part.quantity || ''}
-                    onChange={e => updatePart(idx, 'quantity', Number(e.target.value))}
-                    className="w-20 p-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#ffcc00] text-sm"
-                    placeholder="К-сть"
-                  />
-                  <span className="text-sm font-bold w-24 text-right">
-                    {(part.price * part.quantity).toLocaleString()} ₴
-                  </span>
-                  <button onClick={() => removePart(idx)} className="p-2 text-red-400 hover:text-red-600">
-                    <X size={16} />
-                  </button>
+                <div key={part.id} className="p-2 border rounded-lg space-y-2">
+                  <div className="flex gap-2 items-center">
+                    <select
+                      value={part.partId}
+                      onChange={e => updatePart(idx, 'partId', e.target.value)}
+                      className="flex-1 p-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#ffcc00] text-sm"
+                    >
+                      <option value="">Оберіть запчастину...</option>
+                      {data.inventory.filter(p => p.stock > 0).map(p => (
+                        <option key={p.id} value={p.id}>
+                          {p.name} (є: {p.stock} шт) — {p.salePrice} ₴
+                        </option>
+                      ))}
+                    </select>
+                    <button onClick={() => removePart(idx)} className="p-2 text-red-400 hover:text-red-600 shrink-0">
+                      <X size={16} />
+                    </button>
+                  </div>
+                  <div className="flex gap-2 flex-wrap items-center">
+                    <input
+                      type="number"
+                      min={0}
+                      value={part.price || ''}
+                      onChange={e => updatePart(idx, 'price', Number(e.target.value))}
+                      className="w-28 p-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#ffcc00] text-sm"
+                      placeholder="Ціна ₴"
+                      title="Ціна за одиницю"
+                    />
+                    <input
+                      type="number"
+                      min={1}
+                      value={part.quantity || ''}
+                      onChange={e => updatePart(idx, 'quantity', Number(e.target.value))}
+                      className="w-20 p-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#ffcc00] text-sm"
+                      placeholder="К-сть"
+                    />
+                    <span className="text-sm font-bold ml-auto">
+                      {(part.price * part.quantity).toLocaleString()} ₴
+                    </span>
+                  </div>
                 </div>
               ))}
               <button
@@ -812,15 +816,15 @@ export default function WorkOrders({ data, updateData, addNotification, openDiag
     <div className="space-y-5">
       {/* Toolbar */}
       <div className="flex flex-wrap gap-3 items-center justify-between">
-        <div className="flex gap-2 flex-wrap items-center">
-          <div className="relative">
+        <div className="flex gap-2 flex-wrap items-center flex-1 min-w-0">
+          <div className="relative flex-1 min-w-0 sm:flex-none">
             <Search className="absolute left-3 top-2.5 text-neutral-400" size={18} />
             <input
               type="text"
               placeholder="Пошук замовлення..."
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
-              className="pl-10 pr-4 py-2 border rounded-xl focus:ring-2 focus:ring-[#ffcc00] outline-none w-64 text-sm"
+              className="pl-10 pr-4 py-2 border rounded-xl focus:ring-2 focus:ring-[#ffcc00] outline-none w-full sm:w-64 text-sm"
             />
           </div>
           <div className="flex items-center gap-1">
@@ -837,18 +841,20 @@ export default function WorkOrders({ data, updateData, addNotification, openDiag
             </select>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 shrink-0">
           <button
             onClick={() => setActiveModal('log')}
-            className="bg-neutral-100 hover:bg-neutral-200 text-neutral-700 px-4 py-2 rounded-xl font-bold flex items-center gap-2 text-sm transition-colors"
+            aria-label={`Журнал документів (${loadLog().length} записів)`}
+            className="bg-neutral-100 hover:bg-neutral-200 text-neutral-700 px-3 sm:px-4 py-2 rounded-xl font-bold flex items-center gap-2 text-sm transition-colors"
           >
-            <History size={16} /> Журнал ({loadLog().length})
+            <History size={16} /> <span className="hidden sm:inline">Журнал ({loadLog().length})</span>
           </button>
           <button
             onClick={handleOpenCreate}
-            className="bg-[#ffcc00] text-black px-5 py-2 rounded-xl font-bold flex items-center gap-2 hover:bg-[#e6b800] transition-colors shadow-sm"
+            aria-label="Нове замовлення"
+            className="bg-[#ffcc00] text-black px-3 sm:px-5 py-2 rounded-xl font-bold flex items-center gap-2 hover:bg-[#e6b800] transition-colors shadow-sm text-sm"
           >
-            <Plus size={18} /> Нове замовлення
+            <Plus size={18} /> <span className="hidden sm:inline">Нове замовлення</span><span className="sm:hidden">Нове</span>
           </button>
         </div>
       </div>
@@ -891,31 +897,32 @@ export default function WorkOrders({ data, updateData, addNotification, openDiag
                 className={`p-4 flex items-center justify-between cursor-pointer transition-colors ${isExpanded ? 'bg-neutral-50' : 'hover:bg-neutral-50'}`}
                 onClick={() => setExpandedId(isExpanded ? null : order.id)}
               >
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-neutral-100 rounded-xl flex flex-col items-center justify-center font-bold text-[10px] text-neutral-600 shrink-0">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 bg-neutral-100 rounded-xl flex flex-col items-center justify-center font-bold text-[10px] text-neutral-600 shrink-0">
                     <span className="text-sm">{order.id.split('-')[1]}</span>
                     <span>WO</span>
                   </div>
-                  <div>
-                    <h4 className="font-bold">{client?.name || 'Невідомий клієнт'}</h4>
-                    <p className="text-sm text-neutral-500">
+                  <div className="min-w-0">
+                    <h4 className="font-bold truncate">{client?.name || 'Невідомий клієнт'}</h4>
+                    <p className="text-sm text-neutral-500 truncate">
                       {client?.car.make} {client?.car.model} · <span className="font-mono">{client?.car.plate}</span>
-                      {master && <span className="ml-2 text-blue-600">· {master.name}</span>}
+                      {master && <span className="ml-2 text-blue-600 hidden sm:inline">· {master.name}</span>}
                     </p>
                     <p className="text-xs text-neutral-400">{format(new Date(order.date), 'dd.MM.yyyy')}</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-6">
-                  <span className={`text-[11px] px-3 py-1 rounded-full font-bold uppercase tracking-wider ${STATUS_COLORS[order.status]}`}>
+                <div className="flex items-center gap-2 sm:gap-6">
+                  <span className={`hidden sm:inline text-[11px] px-3 py-1 rounded-full font-bold uppercase tracking-wider ${STATUS_COLORS[order.status]}`}>
                     {STATUS_LABELS[order.status]}
                   </span>
-                  <div className="text-right w-28">
-                    <p className="font-bold text-lg">{order.total.toLocaleString()} ₴</p>
+                  <span className={`sm:hidden w-2.5 h-2.5 rounded-full shrink-0 ${order.status === 'Completed' ? 'bg-green-500' : order.status === 'InProgress' ? 'bg-blue-500' : order.status === 'PendingParts' ? 'bg-yellow-500' : order.status === 'Cancelled' ? 'bg-red-400' : 'bg-neutral-400'}`} aria-label={STATUS_LABELS[order.status]} />
+                  <div className="text-right">
+                    <p className="font-bold text-base sm:text-lg whitespace-nowrap">{order.total.toLocaleString()} ₴</p>
                     <p className={`text-[10px] font-bold ${order.isPaid ? 'text-green-600' : order.status === 'Cancelled' ? 'text-neutral-400' : 'text-red-500'}`}>
                       {order.isPaid ? '✓ ОПЛАЧЕНО' : order.status === 'Cancelled' ? 'СКАСОВАНО' : 'НЕ ОПЛАЧЕНО'}
                     </p>
                   </div>
-                  {isExpanded ? <ChevronUp size={18} className="text-neutral-400" /> : <ChevronDown size={18} className="text-neutral-400" />}
+                  {isExpanded ? <ChevronUp size={18} className="text-neutral-400 shrink-0" /> : <ChevronDown size={18} className="text-neutral-400 shrink-0" />}
                 </div>
               </div>
 
@@ -1229,7 +1236,7 @@ export default function WorkOrders({ data, updateData, addNotification, openDiag
             </div>
 
             <div className="p-6 space-y-4 overflow-y-auto flex-1">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-bold text-neutral-600 mb-1">Майстер</label>
                   <select
@@ -1322,14 +1329,14 @@ export default function WorkOrders({ data, updateData, addNotification, openDiag
               <button onClick={() => setActiveModal(null)} className="text-neutral-400 hover:text-neutral-600"><X size={20} /></button>
             </div>
 
-            <div className="overflow-y-auto flex-1">
+            <div className="overflow-y-auto overflow-x-auto flex-1">
               {log.length === 0 ? (
                 <div className="p-16 text-center text-neutral-400">
                   <History size={48} className="mx-auto mb-3 opacity-30" />
                   <p>Журнал порожній</p>
                 </div>
               ) : (
-                <table className="w-full text-sm">
+                <table className="w-full text-sm min-w-[600px]">
                   <thead className="bg-neutral-50 text-neutral-500 text-[10px] uppercase font-bold border-b sticky top-0">
                     <tr>
                       <th className="px-4 py-3 text-left">Час</th>
@@ -1404,8 +1411,8 @@ export default function WorkOrders({ data, updateData, addNotification, openDiag
               </button>
             </div>
             <div className="p-5 space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="col-span-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="sm:col-span-2">
                   <label className="block text-sm font-medium text-neutral-700 mb-1">Ім'я *</label>
                   <input
                     type="text"
@@ -1440,7 +1447,7 @@ export default function WorkOrders({ data, updateData, addNotification, openDiag
                 <h4 className="font-bold text-sm text-neutral-600 mb-3 flex items-center gap-2">
                   <Car size={16} /> Автомобіль
                 </h4>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-sm font-medium text-neutral-700 mb-1">Марка</label>
                     <select
@@ -1488,7 +1495,7 @@ export default function WorkOrders({ data, updateData, addNotification, openDiag
                       placeholder="AX1234AB"
                     />
                   </div>
-                  <div className="col-span-2">
+                  <div className="sm:col-span-2">
                     <label className="block text-sm font-medium text-neutral-700 mb-1">VIN-код</label>
                     <input
                       type="text"
