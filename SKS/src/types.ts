@@ -20,6 +20,9 @@ export type Supplier = {
   contact?: string;
   phone?: string;
   email?: string;
+  edrpou?: string;
+  inn?: string;
+  aliases?: string[];
 };
 
 export type Part = {
@@ -193,6 +196,79 @@ export type WarehouseDocument = {
   createdAt?: string;
 };
 
+
+
+export type MappingColumns = {
+  document_number?: string[];
+  document_date?: string[];
+  currency?: string[];
+  product_name?: string[];
+  supplier_sku?: string[];
+  quantity?: string[];
+  unit?: string[];
+  price_net?: string[];
+  vat_rate?: string[];
+  vat_amount?: string[];
+  price_gross?: string[];
+};
+
+export type ImportMapping = {
+  id: string;
+  supplier_id: string;
+  file_type: 'xlsx' | 'csv';
+  header_row: number;
+  columns: MappingColumns;
+  options?: {
+    sheet_name?: string;
+    delimiter?: string;
+    decimal_separator?: ',' | '.';
+  };
+  version: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type InternalImportDocument = {
+  header: {
+    supplier_id: string;
+    document_number: string;
+    document_date?: string;
+    currency?: string;
+    needs_manual_header?: boolean;
+  };
+  items: Array<{
+    product_name: string;
+    supplier_sku?: string;
+    quantity: number;
+    unit?: string;
+    price_net?: number;
+    vat_rate?: number;
+    vat_amount?: number;
+    price_gross?: number;
+  }>;
+};
+
+export type ImportRowValidationError = {
+  row_index: number;
+  field: string;
+  message: string;
+};
+
+export type ImportPreviewResponse = {
+  ok: boolean;
+  error_code?: 'supplier_unknown' | 'header_missing' | 'items_empty' | 'validation_failed';
+  warnings: string[];
+  errors: ImportRowValidationError[];
+  data?: InternalImportDocument;
+  debug: {
+    detected_headers: string[];
+    matched_columns: Record<string, string>;
+    unmapped_headers: string[];
+    mapping_id?: string;
+    mapping_version?: number;
+  };
+};
+
 export type AppData = {
   clients: Client[];
   inventory: Part[];
@@ -216,6 +292,7 @@ export type AppData = {
   importJobs: ImportJob[];
   receiptDrafts: ReceiptDraft[];
   supplierProductMap: SupplierProductMap[];
+  importMappings: ImportMapping[];
 };
 
 export type ImportJobStatus = 'QUEUED' | 'PROCESSING' | 'DONE' | 'FAILED';

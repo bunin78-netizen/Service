@@ -1,0 +1,80 @@
+[
+  {
+    "source_file": "Expense_0140718_22.01.2026.xlsx",
+    "supplier_id": "s1",
+    "file_type": "xlsx",
+    "header_row": 1,
+    "columns": {
+      "document_number": ["номер", "документ", "№ документа"],
+      "document_date": ["дата", "дата документа"],
+      "currency": ["валюта"],
+      "product_name": ["найменування", "назва товару"],
+      "supplier_sku": ["артикул", "код товару"],
+      "quantity": ["кількість", "к-сть"],
+      "unit": ["од.", "одиниця"],
+      "price_net": ["ціна без пдв", "ціна нетто"],
+      "vat_rate": ["пдв %", "ставка пдв"],
+      "vat_amount": ["сума пдв"],
+      "price_gross": ["ціна з пдв", "сума"]
+    },
+    "options": { "sheet_name": "Sheet1", "decimal_separator": "," }
+  },
+  {
+    "source_file": "lines_2026-02-01_-_2026-02-28.xlsx",
+    "supplier_id": "s2",
+    "file_type": "xlsx",
+    "header_row": 1,
+    "columns": {
+      "document_number": ["invoice no", "doc no"],
+      "document_date": ["invoice date", "date"],
+      "currency": ["currency"],
+      "product_name": ["description", "name"],
+      "supplier_sku": ["supplier sku", "sku"],
+      "quantity": ["qty", "quantity"],
+      "unit": ["unit"],
+      "price_net": ["price net", "net price"],
+      "vat_rate": ["vat rate", "vat %"],
+      "vat_amount": ["vat amount"],
+      "price_gross": ["price gross", "line total"]
+    },
+    "options": { "sheet_name": "Sheet1", "decimal_separator": "." }
+  },
+  {
+    "source_file": "KH26F010331.xlsx",
+    "supplier_id": "s3",
+    "file_type": "xlsx",
+    "header_row": 1,
+    "columns": {
+      "document_number": ["номер документа", "№"],
+      "document_date": ["дата документа", "дата"],
+      "product_name": ["товар", "найменування"],
+      "supplier_sku": ["код", "артикул"],
+      "quantity": ["кол-во", "кількість"],
+      "unit": ["ед.", "од."],
+      "price_net": ["цена без ндс", "ціна без пдв"],
+      "vat_rate": ["ндс %", "пдв %"],
+      "price_gross": ["цена с ндс", "сума"]
+    },
+    "options": { "sheet_name": "Sheet1", "decimal_separator": "," }
+  },
+  {
+    "source_file": "invoice-UA_UU1_SIP_26007959 (3).csv",
+    "supplier_id": "s4",
+    "file_type": "csv",
+    "header_row": 1,
+    "columns": {
+      "document_number": ["invoice", "номер"],
+      "document_date": ["date", "дата"],
+      "currency": ["currency", "валюта"],
+      "product_name": ["item", "найменування"],
+      "supplier_sku": ["sku", "артикул"],
+      "quantity": ["qty", "quantity", "кількість"],
+      "unit": ["unit", "од."],
+      "price_net": ["price net", "ціна без пдв"],
+      "vat_rate": ["vat", "vat %", "пдв %"],
+      "vat_amount": ["vat amount", "сума пдв"],
+      "price_gross": ["total", "line total", "сума"]
+    },
+    "options": { "delimiter": ";", "decimal_separator": "," }
+  }
+]

@@ -23,10 +23,10 @@ const INITIAL_DATA: AppData = {
     { id: 'c7', name: 'Кузов' },
   ],
   suppliers: [
-    { id: 's1', name: 'Омега-Автопоставка', phone: '+380571234567', email: 'omega@auto.ua', website: 'https://my.omega.page' } as any,
-    { id: 's2', name: 'Inter Cars Ukraine', phone: '+380449876543', email: 'info@intercars.ua' },
-    { id: 's3', name: 'ELIT Ukraine', phone: '+380441112233', email: 'sales@elit.ua' },
-    { id: 's4', name: 'Автотехнікс', phone: '+380445556677', email: 'order@autotechnics.ua' },
+    { id: 's1', name: 'Омега-Автопоставка', phone: '+380571234567', email: 'omega@auto.ua', website: 'https://my.omega.page', edrpou: '40112233', aliases: ['omega', 'омега'] } as any,
+    { id: 's2', name: 'Inter Cars Ukraine', phone: '+380449876543', email: 'info@intercars.ua', aliases: ['intercars', 'inter cars'] },
+    { id: 's3', name: 'ELIT Ukraine', phone: '+380441112233', email: 'sales@elit.ua', aliases: ['elit'] },
+    { id: 's4', name: 'Автотехнікс', phone: '+380445556677', email: 'order@autotechnics.ua', aliases: ['autotechnics', 'автотехникс'] },
   ],
   companySettings: {
     name: 'SmartKharkov',
@@ -231,6 +231,7 @@ const INITIAL_DATA: AppData = {
   importJobs: [],
   receiptDrafts: [],
   supplierProductMap: [],
+  importMappings: [],
 };
 
 export function loadData(): AppData {
@@ -249,6 +250,7 @@ export function loadData(): AppData {
       importJobs: parsed.importJobs || INITIAL_DATA.importJobs,
       receiptDrafts: parsed.receiptDrafts || INITIAL_DATA.receiptDrafts,
       supplierProductMap: parsed.supplierProductMap || INITIAL_DATA.supplierProductMap,
+      importMappings: parsed.importMappings || INITIAL_DATA.importMappings,
     };
   }
   return INITIAL_DATA;
