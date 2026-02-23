@@ -20,6 +20,7 @@ import {
   ShoppingBag,
   Receipt,
   ChevronDown,
+  MessageCircle,
 } from 'lucide-react';
 import { loadData, saveData } from './store';
 import { AppData, Notification } from './types';
@@ -33,12 +34,14 @@ import Expenses from './pages/Expenses';
 import SettingsPage from './pages/Settings';
 import UsersPage from './pages/Users';
 import TelegramPage from './pages/Telegram';
+import ViberPage from './pages/Viber';
 import DatabasePage from './pages/Database';
 import SupplierShop from './pages/SupplierShop';
 import RROPage from './pages/RRO';
 import Login from './pages/Login';
 import WarehouseDocuments from './pages/WarehouseDocuments';
 import { sendTelegramNotification } from './pages/Telegram';
+import { sendViberNotification } from './pages/Viber';
 
 const MOBILE_BREAKPOINT = 768;
 
@@ -157,6 +160,20 @@ export function App() {
       sendTelegramNotification(
         data.telegramSettings,
         telegramType,
+        notification.title,
+        notification.message
+      );
+    }
+
+    // Send Viber notification if enabled
+    if (data.viberSettings?.enabled) {
+      const viberType = notification.type === 'order' ? 'order'
+        : notification.type === 'payment' ? 'payment'
+        : notification.type === 'stock' ? 'stock'
+        : 'order';
+      sendViberNotification(
+        data.viberSettings,
+        viberType,
         notification.title,
         notification.message
       );
