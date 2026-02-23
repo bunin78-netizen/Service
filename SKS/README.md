@@ -133,7 +133,7 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 - Category breakdown
 
 ### RRO / PRRO (Fiscal Register)
-- Support: Checkbox, Vchasno Kasa, Taxer, DPS Kasa
+- Support: Checkbox, Vchasno Kasa, Taxer, DPS Kasa, ПриватБанк Еквайринг, Monobank Еквайринг
 - Fiscalize orders with one click
 - X-report (interim) and Z-report (close shift)
 - Manual receipt creation
