@@ -145,14 +145,16 @@ export function validateRows(doc: InternalImportDocument): ImportRowValidationEr
 function mappings(data: AppData) { return data.importMappings || []; }
 
 export async function postImportPreview(data: AppData, file: File): Promise<ImportPreviewResponse> {
-  const parsed = await readTabularData(file);
-  const supplierId = detectSupplierId(data, parsed.rows, file.name);
-  if (!supplierId) return { ok: false, error_code: 'supplier_unknown', warnings: ['Не вдалося визначити постачальника. Потрібен ручний mapping.'], errors: [], debug: { detected_headers: parsed.detectedHeaders, matched_columns: {}, unmapped_headers: parsed.normalizedHeaders } };
+  const initialParse = await readTabularData(file);
+  const supplierId = detectSupplierId(data, initialParse.rows, file.name);
+  if (!supplierId) return { ok: false, error_code: 'supplier_unknown', warnings: ['Не вдалося визначити постачальника. Потрібен ручний mapping.'], errors: [], debug: { detected_headers: initialParse.detectedHeaders, matched_columns: {}, unmapped_headers: initialParse.normalizedHeaders } };
 
   const mapping = mappings(data).filter((m) => m.supplier_id === supplierId && m.file_type === detectFileType(file.name)).sort((a, b) => b.version - a.version)[0];
-  if (!mapping) return { ok: false, error_code: 'header_missing', warnings: [`Не знайдено mapping для supplier_id=${supplierId}`], errors: [], debug: { detected_headers: parsed.detectedHeaders, matched_columns: {}, unmapped_headers: parsed.normalizedHeaders } };
+  if (!mapping) return { ok: false, error_code: 'header_missing', warnings: [`Не знайдено mapping для supplier_id=${supplierId}`], errors: [], debug: { detected_headers: initialParse.detectedHeaders, matched_columns: {}, unmapped_headers: initialParse.normalizedHeaders } };
 
-  const applied = applyMapping(parsed.rows, mapping);
+  const mappedParse = await readTabularData(file, { sheetName: mapping.options?.sheet_name, delimiter: mapping.options?.delimiter });
+
+  const applied = applyMapping(mappedParse.rows, mapping);
   const errors = validateRows(applied.doc);
   return {
     ok: errors.length === 0,
