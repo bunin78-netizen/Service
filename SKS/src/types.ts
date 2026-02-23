@@ -207,6 +207,7 @@ export type AppData = {
   settings: {
     rroEnabled: boolean;
     rroApiKey: string;
+    defaultMarkup: number;
   };
   telegramSettings: TelegramSettings;
   viberSettings: ViberSettings;
