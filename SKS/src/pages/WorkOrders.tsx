@@ -29,6 +29,7 @@ export type DocumentLog = {
 };
 
 const LOG_KEY = 'smartkharkov_doc_log';
+const DROPDOWN_CLOSE_DELAY = 150;
 
 function loadLog(): DocumentLog[] {
   const s = localStorage.getItem(LOG_KEY);
@@ -132,6 +133,8 @@ export default function WorkOrders({ data, updateData, addNotification, openDiag
   const [receiptSendStatus, setReceiptSendStatus] = useState<Record<string, 'idle' | 'loading' | 'success' | 'error'>>({});
   const [docSendStatus, setDocSendStatus] = useState<Record<string, 'idle' | 'loading' | 'success' | 'error'>>({});
   const [approvalSendStatus, setApprovalSendStatus] = useState<Record<string, 'idle' | 'loading' | 'success' | 'error'>>({});
+  const [partSearchTerms, setPartSearchTerms] = useState<Record<number, string>>({});
+  const [partDropdownOpen, setPartDropdownOpen] = useState<number | null>(null);
 
   // ── Filtered orders ──────────────────────────────────────────────────────
   const filteredOrders = useMemo(() => {
@@ -155,6 +158,8 @@ export default function WorkOrders({ data, updateData, addNotification, openDiag
   // ── Create Order ─────────────────────────────────────────────────────────
   const handleOpenCreate = () => {
     setOrderForm(emptyOrderForm());
+    setPartSearchTerms({});
+    setPartDropdownOpen(null);
     setActiveModal('create');
   };
 
@@ -188,6 +193,8 @@ export default function WorkOrders({ data, updateData, addNotification, openDiag
       services: order.services.length > 0 ? order.services.map(s => ({ ...s })) : [{ id: generateId(), name: '', price: 0, hours: 1, masterId: '' }],
       parts: order.parts.map(p => ({ ...p })),
     });
+    setPartSearchTerms({});
+    setPartDropdownOpen(null);
     setActiveModal('edit');
   };
 
@@ -788,21 +795,53 @@ export default function WorkOrders({ data, updateData, addNotification, openDiag
               <span className="text-xs text-neutral-400">ціна підтягується автоматично, але може бути змінена</span>
             </div>
             <div className="space-y-2">
-              {orderForm.parts.map((part, idx) => (
+              {orderForm.parts.map((part, idx) => {
+                const searchTxt = partSearchTerms[idx] ?? '';
+                const selectedPartObj = data.inventory.find(p => p.id === part.partId);
+                const filteredParts = data.inventory.filter(p => {
+                  if (p.stock <= 0) return false;
+                  const q = searchTxt.toLowerCase();
+                  return !q || p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q) || p.category.toLowerCase().includes(q);
+                });
+                return (
                 <div key={part.id} className="p-2 border rounded-lg space-y-2">
                   <div className="flex gap-2 items-center">
-                    <select
-                      value={part.partId}
-                      onChange={e => updatePart(idx, 'partId', e.target.value)}
-                      className="flex-1 p-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#ffcc00] text-sm"
-                    >
-                      <option value="">Оберіть запчастину...</option>
-                      {data.inventory.filter(p => p.stock > 0).map(p => (
-                        <option key={p.id} value={p.id}>
-                          {p.name} (є: {p.stock} шт) — {p.salePrice} ₴
-                        </option>
-                      ))}
-                    </select>
+                    <div className="flex-1 relative">
+                      <Search size={14} className="absolute left-2 top-2.5 text-neutral-400 pointer-events-none" />
+                      <input
+                        type="text"
+                        placeholder="Пошук запчастини за назвою, артикулом..."
+                        value={partDropdownOpen === idx ? searchTxt : (selectedPartObj ? `${selectedPartObj.name} — ${selectedPartObj.salePrice} ₴ (є: ${selectedPartObj.stock} шт)` : '')}
+                        onFocus={() => {
+                          setPartDropdownOpen(idx);
+                          setPartSearchTerms(t => ({ ...t, [idx]: '' }));
+                        }}
+                        onChange={e => setPartSearchTerms(t => ({ ...t, [idx]: e.target.value }))}
+                        onBlur={() => setTimeout(() => setPartDropdownOpen(open => open === idx ? null : open), DROPDOWN_CLOSE_DELAY)}
+                        className="w-full pl-7 pr-3 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#ffcc00] text-sm"
+                      />
+                      {partDropdownOpen === idx && (
+                        <div className="absolute top-full left-0 right-0 z-20 bg-white border rounded-xl shadow-xl mt-1 max-h-52 overflow-y-auto">
+                          {filteredParts.length === 0 ? (
+                            <div className="px-3 py-2 text-sm text-neutral-400">Нічого не знайдено</div>
+                          ) : filteredParts.map(p => (
+                            <button
+                              key={p.id}
+                              type="button"
+                              onMouseDown={() => {
+                                updatePart(idx, 'partId', p.id);
+                                setPartSearchTerms(t => ({ ...t, [idx]: '' }));
+                                setPartDropdownOpen(null);
+                              }}
+                              className={`w-full text-left px-3 py-2 hover:bg-[#ffcc00]/20 text-sm flex justify-between items-center gap-2 ${p.id === part.partId ? 'bg-[#ffcc00]/10 font-medium' : ''}`}
+                            >
+                              <span className="truncate">{p.name}</span>
+                              <span className="text-neutral-500 text-xs shrink-0">{p.sku} · {p.stock} шт · {p.salePrice} ₴</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                     <button onClick={() => removePart(idx)} className="p-2 text-red-400 hover:text-red-600 shrink-0">
                       <X size={16} />
                     </button>
@@ -830,7 +869,8 @@ export default function WorkOrders({ data, updateData, addNotification, openDiag
                     </span>
                   </div>
                 </div>
-              ))}
+              );
+              })}
               <button
                 onClick={addPart}
                 className="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1 font-medium"
