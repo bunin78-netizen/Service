@@ -6,7 +6,7 @@ import { generateId } from '../store';
 type SortField = 'name' | 'sku' | 'category' | 'stock' | 'purchasePrice' | 'salePrice';
 type SortDir = 'asc' | 'desc';
 
-export default function Inventory({ data, updateData, onAddProduct }: { data: AppData, updateData: (d: Partial<AppData>) => void, onAddProduct?: () => void }) {
+export default function Inventory({ data, updateData }: { data: AppData, updateData: (d: Partial<AppData>) => void }) {
   const currentUser = data.users.find(u => u.id === data.currentUserId);
   const [searchTerm, setSearchTerm] = useState('');
   const [filter, setFilter] = useState<'all' | 'low'>('all');
@@ -251,7 +251,7 @@ export default function Inventory({ data, updateData, onAddProduct }: { data: Ap
               Постачальники
             </button>
             <button 
-              onClick={() => onAddProduct ? onAddProduct() : handleOpenPartModal()}
+              onClick={() => handleOpenPartModal()}
               className="bg-[#ffcc00] text-black px-4 py-2 rounded-xl font-bold flex items-center gap-2 hover:bg-[#e6b800] transition-colors shadow-sm text-sm"
             >
               <Plus size={18} /> Додати товар

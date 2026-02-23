@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { AppData, WarehouseDocument, WarehouseDocumentItem } from '../types';
 import { Plus, FileText, X, Save, Trash2, ChevronDown, ChevronUp, Printer, RefreshCw, Search } from 'lucide-react';
 import { generateId } from '../store';
@@ -84,13 +84,9 @@ const EMPTY_FORM: Omit<WarehouseDocument, 'id'> = {
 export default function WarehouseDocuments({
   data,
   updateData,
-  autoOpenNew,
-  onAutoOpenHandled,
 }: {
   data: AppData;
   updateData: (d: Partial<AppData>) => void;
-  autoOpenNew?: boolean;
-  onAutoOpenHandled?: () => void;
 }) {
   const currentUser = data.users.find(u => u.id === data.currentUserId);
   const [showModal, setShowModal] = useState(false);
@@ -101,15 +97,6 @@ export default function WarehouseDocuments({
   const [typeFilter, setTypeFilter] = useState<WarehouseDocument['type'] | 'all'>('all');
 
   const docs = data.warehouseDocuments || [];
-
-  useEffect(() => {
-    if (autoOpenNew) {
-      setEditingDoc(null);
-      setForm({ ...EMPTY_FORM, type: 'incoming', date: new Date().toISOString().split('T')[0], items: [] });
-      setShowModal(true);
-      onAutoOpenHandled?.();
-    }
-  }, [autoOpenNew, onAutoOpenHandled]);
 
   const openNew = () => {
     setEditingDoc(null);
