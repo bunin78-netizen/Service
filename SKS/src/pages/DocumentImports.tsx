@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { AppData, ImportJobStatus } from '../types';
-import { MockExtractor, createImportJob, createReceiptDraft, hashFile, mapImportLine, postReceiptDraft, processImportJob, validateImportLine } from '../services/imports';
+import { MockExtractor, createImportJob, createReceiptDraft, deleteImportJob, hashFile, mapImportLine, postReceiptDraft, processImportJob, validateImportLine } from '../services/imports';
 
 const STATUS_OPTIONS: { value: '' | ImportJobStatus; label: string }[] = [
   { value: '', label: 'Всі статуси' },
@@ -18,6 +18,9 @@ export default function DocumentImports({ data, updateData }: { data: AppData; u
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const extractor = useMemo(() => new MockExtractor(), []);
+
+  const currentUser = data.users.find(u => u.id === data.currentUserId);
+  const isAdmin = currentUser?.role === 'admin';
 
   const selectedJob = data.importJobs.find(j => j.id === selectedJobId) || null;
   const selectedDraft = selectedJob ? data.receiptDrafts.find(d => d.importJobId === selectedJob.id) : undefined;
@@ -79,6 +82,21 @@ export default function DocumentImports({ data, updateData }: { data: AppData; u
     }
   };
 
+  const onDeleteJob = (jobId: string) => {
+    if (!window.confirm('Видалити цей імпорт?')) return;
+    try {
+      const next = deleteImportJob(data, jobId);
+      updateData({ importJobs: next.importJobs, receiptDrafts: next.receiptDrafts });
+      if (selectedJobId === jobId) {
+        const deletedIndex = data.importJobs.findIndex(j => j.id === jobId);
+        const fallback = data.importJobs[deletedIndex + 1] || data.importJobs[deletedIndex - 1];
+        setSelectedJobId(fallback?.id || null);
+      }
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Не вдалося видалити');
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="bg-white p-6 rounded-2xl border shadow-sm">
@@ -112,10 +130,21 @@ export default function DocumentImports({ data, updateData }: { data: AppData; u
           </div>
           {filteredJobs.length === 0 && <p className="text-xs text-neutral-400">Нічого не знайдено</p>}
           {filteredJobs.map(job => (
-            <button key={job.id} onClick={() => setSelectedJobId(job.id)} className={`w-full text-left rounded-lg border p-3 ${selectedJobId === job.id ? 'border-blue-500 bg-blue-50' : 'border-neutral-200'}`}>
-              <div className="font-medium text-sm">{job.sourceFilename}</div>
-              <div className="text-xs text-neutral-500">{job.status}{job.docDate ? ` · ${job.docDate}` : ''}</div>
-            </button>
+            <div key={job.id} className="relative group">
+              <button onClick={() => setSelectedJobId(job.id)} className={`w-full text-left rounded-lg border p-3 ${selectedJobId === job.id ? 'border-blue-500 bg-blue-50' : 'border-neutral-200'}`}>
+                <div className="font-medium text-sm pr-6">{job.sourceFilename}</div>
+                <div className="text-xs text-neutral-500">{job.status}{job.docDate ? ` · ${job.docDate}` : ''}</div>
+              </button>
+              {isAdmin && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); onDeleteJob(job.id); }}
+                  className="absolute top-2 right-2 w-5 h-5 flex items-center justify-center rounded text-neutral-400 hover:bg-red-100 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity text-xs font-bold"
+                  title="Видалити"
+                >
+                  ×
+                </button>
+              )}
+            </div>
           ))}
         </div>
 

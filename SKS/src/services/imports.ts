@@ -106,12 +106,19 @@ export function createImportJob(data: AppData, payload: { filename: string; file
   };
 }
 
+function parseNum(v: unknown, fallback = 0): number {
+  if (v == null) return fallback;
+  if (typeof v === 'number') return isNaN(v) ? fallback : v;
+  const n = Number(String(v).trim().replace(/,/g, '.'));
+  return isNaN(n) ? fallback : n;
+}
+
 export function normalizeLine(importJobId: string, line: ExtractedDocument['lines'][0]): ImportLine {
-  const qty = Number(line.qty || 0);
-  const priceNet = Number(line.priceNet || 0);
-  const vatRate = Number(line.vatRate ?? 0.2);
+  const qty = parseNum(line.qty);
+  const priceNet = parseNum(line.priceNet);
+  const vatRate = line.vatRate != null ? parseNum(line.vatRate) : 0.2;
   const priceGross = Number((priceNet * (1 + vatRate)).toFixed(2));
-  const lineTotal = Number((line.lineTotal ?? qty * priceGross).toFixed(2));
+  const lineTotal = line.lineTotal != null ? parseNum(line.lineTotal) : Number((qty * priceGross).toFixed(2));
 
   return {
     id: generateId(),
@@ -137,9 +144,14 @@ function findMappedProduct(data: AppData, supplierId: string | undefined, line: 
     if (mapped) return mapped.productId;
   }
 
+  if (line.supplierSkuRaw) {
+    const bySupplierSku = data.inventory.find(p => p.sku === line.supplierSkuRaw);
+    if (bySupplierSku) return bySupplierSku.id;
+  }
+
   if (line.barcodeRaw) {
-    const bySku = data.inventory.find(p => p.sku === line.barcodeRaw);
-    if (bySku) return bySku.id;
+    const byBarcode = data.inventory.find(p => p.sku === line.barcodeRaw);
+    if (byBarcode) return byBarcode.id;
   }
 
   const exactByName = data.inventory.find(p => p.name.toLowerCase() === line.nameRaw.toLowerCase());
@@ -147,12 +159,11 @@ function findMappedProduct(data: AppData, supplierId: string | undefined, line: 
 }
 
 export async function processImportJob(data: AppData, jobId: string, extractor: DocumentExtractor): Promise<AppData> {
-  const job = data.importJobs.find(j => j.id === jobId);
-  if (!job) throw new Error('Import job not found');
+  const jobIndex = data.importJobs.findIndex(j => j.id === jobId);
+  if (jobIndex === -1) throw new Error('Import job not found');
+  const job = data.importJobs[jobIndex];
 
-  job.status = 'PROCESSING';
-  job.updatedAt = new Date().toISOString();
-
+  let updatedJob: ImportJob;
   try {
     const extracted = await extractor.extract(job.sourceFilename);
     const lines = extracted.lines.map(line => normalizeLine(job.id, line)).map(l => ({
@@ -160,20 +171,28 @@ export async function processImportJob(data: AppData, jobId: string, extractor: 
       matchedProductId: findMappedProduct(data, extracted.supplier?.supplierId, l),
     }));
 
-    job.status = 'DONE';
-    job.supplierId = extracted.supplier?.supplierId;
-    job.docNumber = extracted.docNumber;
-    job.docDate = extracted.docDate;
-    job.rawExtractionJson = extracted;
-    job.lines = lines;
-    job.updatedAt = new Date().toISOString();
+    updatedJob = {
+      ...job,
+      status: 'DONE',
+      supplierId: extracted.supplier?.supplierId,
+      docNumber: extracted.docNumber,
+      docDate: extracted.docDate,
+      rawExtractionJson: extracted,
+      lines,
+      updatedAt: new Date().toISOString(),
+    };
   } catch (e) {
-    job.status = 'FAILED';
-    job.errorMessage = e instanceof Error ? e.message : 'Unknown extraction error';
-    job.updatedAt = new Date().toISOString();
+    updatedJob = {
+      ...job,
+      status: 'FAILED',
+      errorMessage: e instanceof Error ? e.message : 'Unknown extraction error',
+      updatedAt: new Date().toISOString(),
+    };
   }
 
-  return { ...data, importJobs: [...data.importJobs] };
+  const importJobs = [...data.importJobs];
+  importJobs[jobIndex] = updatedJob;
+  return { ...data, importJobs };
 }
 
 export function mapImportLine(data: AppData, jobId: string, importLineId: string, productId: string): AppData {
@@ -284,4 +303,16 @@ export function validateImportLine(line: ImportLine): string[] {
   if (line.priceNet < 0) errors.push('price_net >= 0');
   if (Math.abs(line.lineTotal - line.qty * line.priceGross) > 0.05) errors.push('line_total must match qty * price');
   return errors;
+}
+
+export function deleteImportJob(data: AppData, jobId: string): AppData {
+  const draft = data.receiptDrafts.find(d => d.importJobId === jobId);
+  if (draft?.status === 'POSTED') {
+    throw new Error('Неможливо видалити: документ вже проведений.');
+  }
+  return {
+    ...data,
+    importJobs: data.importJobs.filter(j => j.id !== jobId),
+    receiptDrafts: data.receiptDrafts.filter(d => d.importJobId !== jobId),
+  };
 }
