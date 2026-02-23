@@ -1839,18 +1839,28 @@ function EmployeesTab({ data, updateData, search }: { data: AppData; updateData:
 
   const openModal = (employee?: Employee) => {
     setEditEmployee(employee || null);
-    setForm(employee || { name: '', role: 'Master', dailyRate: 0, bonusPercentage: 0 });
+    setForm(employee || { name: '', role: 'Master', dailyRate: 0, bonusPercentage: 0, address: '', inn: '', idDocument: { series: '', number: '', issuedBy: '', issuedDate: '' } });
     setShowModal(true);
   };
 
   const handleSave = () => {
     if (!form.name) return;
+    const idDoc = form.idDocument;
+    const hasIdDoc = idDoc && (idDoc.series || idDoc.number || idDoc.issuedBy || idDoc.issuedDate);
     const employee: Employee = {
       id: editEmployee?.id || generateId(),
       name: form.name!,
       role: form.role || 'Master',
       dailyRate: form.dailyRate || 0,
       bonusPercentage: form.bonusPercentage || 0,
+      address: form.address || undefined,
+      inn: form.inn || undefined,
+      idDocument: hasIdDoc ? {
+        series: idDoc.series || undefined,
+        number: idDoc.number || undefined,
+        issuedBy: idDoc.issuedBy || undefined,
+        issuedDate: idDoc.issuedDate || undefined,
+      } : undefined,
     };
     if (editEmployee) {
       updateData({ employees: data.employees.map(e => e.id === editEmployee.id ? employee : e) });
@@ -1935,6 +1945,8 @@ function EmployeesTab({ data, updateData, search }: { data: AppData; updateData:
                           <div>
                             <p className="font-semibold">{employee.name}</p>
                             <p className="text-[10px] text-neutral-400">ID: {employee.id}</p>
+                            {employee.address && <p className="text-[10px] text-neutral-400">{employee.address}</p>}
+                            {employee.inn && <p className="text-[10px] text-neutral-400">ІПН: {employee.inn}</p>}
                           </div>
                         </div>
                       </td>
@@ -1968,7 +1980,7 @@ function EmployeesTab({ data, updateData, search }: { data: AppData; updateData:
 
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl w-full max-w-md shadow-2xl overflow-hidden">
+          <div className="bg-white rounded-xl w-full max-w-lg shadow-2xl overflow-hidden">
             <div className="p-5 border-b bg-neutral-50 flex justify-between items-center">
               <h3 className="font-bold text-lg flex items-center gap-2">
                 <UserCog className="text-[#ffcc00]" size={20} />
@@ -1976,7 +1988,7 @@ function EmployeesTab({ data, updateData, search }: { data: AppData; updateData:
               </h3>
               <button onClick={() => setShowModal(false)}><X size={20} className="text-neutral-400" /></button>
             </div>
-            <div className="p-5 space-y-4">
+            <div className="p-5 space-y-4 max-h-[70vh] overflow-y-auto">
               <div>
                 <label className="block text-xs font-bold text-neutral-600 mb-1">Ім'я *</label>
                 <input
@@ -2020,6 +2032,72 @@ function EmployeesTab({ data, updateData, search }: { data: AppData; updateData:
                     min={0}
                     max={100}
                   />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-neutral-600 mb-1">Адреса</label>
+                <input
+                  type="text"
+                  value={form.address || ''}
+                  onChange={e => setForm({ ...form, address: e.target.value })}
+                  className="w-full p-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#ffcc00]"
+                  placeholder="м. Харків, вул. ..."
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-neutral-600 mb-1">ІПН (індивідуальний податковий номер)</label>
+                <input
+                  type="text"
+                  value={form.inn || ''}
+                  onChange={e => setForm({ ...form, inn: e.target.value.replace(/\D/g, '') })}
+                  className="w-full p-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#ffcc00]"
+                  placeholder="1234567890"
+                  maxLength={10}
+                  inputMode="numeric"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-neutral-600 mb-2">Посвідчення особи</label>
+                <div className="grid grid-cols-2 gap-3 p-3 bg-neutral-50 rounded-lg">
+                  <div>
+                    <label className="block text-[10px] font-bold text-neutral-500 mb-1">Серія</label>
+                    <input
+                      type="text"
+                      value={form.idDocument?.series || ''}
+                      onChange={e => setForm({ ...form, idDocument: { ...form.idDocument, series: e.target.value } })}
+                      className="w-full p-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#ffcc00] text-sm"
+                      placeholder="КН"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-neutral-500 mb-1">Номер</label>
+                    <input
+                      type="text"
+                      value={form.idDocument?.number || ''}
+                      onChange={e => setForm({ ...form, idDocument: { ...form.idDocument, number: e.target.value } })}
+                      className="w-full p-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#ffcc00] text-sm"
+                      placeholder="123456"
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-[10px] font-bold text-neutral-500 mb-1">Ким виданий</label>
+                    <input
+                      type="text"
+                      value={form.idDocument?.issuedBy || ''}
+                      onChange={e => setForm({ ...form, idDocument: { ...form.idDocument, issuedBy: e.target.value } })}
+                      className="w-full p-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#ffcc00] text-sm"
+                      placeholder="Харківський РВ УМВС"
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-[10px] font-bold text-neutral-500 mb-1">Дата видачі</label>
+                    <input
+                      type="date"
+                      value={form.idDocument?.issuedDate || ''}
+                      onChange={e => setForm({ ...form, idDocument: { ...form.idDocument, issuedDate: e.target.value } })}
+                      className="w-full p-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#ffcc00] text-sm"
+                    />
+                  </div>
                 </div>
               </div>
             </div>

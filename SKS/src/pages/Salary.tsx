@@ -109,6 +109,28 @@ export default function Salary({ data }: { data: AppData }) {
               <span className="text-neutral-500">Днів у періоді:</span>
               <span className="ml-2 font-medium">{daysInRange.length}</span>
             </div>
+            {employee.address && (
+              <div className="col-span-2">
+                <span className="text-neutral-500">Адреса:</span>
+                <span className="ml-2 font-medium">{employee.address}</span>
+              </div>
+            )}
+            {employee.inn && (
+              <div>
+                <span className="text-neutral-500">ІПН:</span>
+                <span className="ml-2 font-medium">{employee.inn}</span>
+              </div>
+            )}
+            {employee.idDocument && (employee.idDocument.series || employee.idDocument.number) && (
+              <div className="col-span-2">
+                <span className="text-neutral-500">Посвідчення:</span>
+                <span className="ml-2 font-medium">
+                  {[employee.idDocument.series, employee.idDocument.number].filter(Boolean).join(' ')}
+                  {employee.idDocument.issuedBy && `, ${employee.idDocument.issuedBy}`}
+                  {employee.idDocument.issuedDate && ` від ${employee.idDocument.issuedDate}`}
+                </span>
+              </div>
+            )}
           </div>
         </div>
       )}
