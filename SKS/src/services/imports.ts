@@ -23,8 +23,27 @@ export interface DocumentExtractor {
   extract(fileName: string): Promise<ExtractedDocument>;
 }
 
+/** Parse filenames like Expense_0318580_19.02.2026.pdf → { docNumber, docDate } */
+function parseExpenseFilename(fileName: string): { docNumber: string; docDate: string } | null {
+  const base = fileName.replace(/\.pdf$/i, '');
+  const parts = base.split('_');
+  if (parts.length < 3 || parts[0].toLowerCase() !== 'expense') return null;
+  const docNumber = parts[1];
+  if (!docNumber) return null;
+  const rawDate = parts[2]; // DD.MM.YYYY
+  const dateParts = rawDate.split('.');
+  if (dateParts.length !== 3) return null;
+  const [dd, mm, yyyy] = dateParts;
+  const day = Number(dd);
+  const month = Number(mm);
+  const year = Number(yyyy);
+  if (!dd || !mm || !yyyy || yyyy.length !== 4 || day < 1 || day > 31 || month < 1 || month > 12 || year < 1000) return null;
+  return { docNumber, docDate: `${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}` };
+}
+
 export class MockExtractor implements DocumentExtractor {
   async extract(fileName: string): Promise<ExtractedDocument> {
+    // Full demo data for the fixture file
     if (fileName.includes('Expense_0318580_19.02.2026.pdf')) {
       return {
         supplier: { name: 'Омега-Автопоставка', supplierId: 's1' },
@@ -35,6 +54,16 @@ export class MockExtractor implements DocumentExtractor {
           { name: 'Мастило 5W30 4л', supplierSku: 'OIL-5W30-4L', barcode: '482000000001', qty: 2, unit: 'шт', priceNet: 1000, vatRate: 0.2, lineTotal: 2400, confidence: 0.98 },
           { name: 'Антифриз G12 5л', supplierSku: 'COOL-5L', barcode: '482000000004', qty: 1, unit: 'шт', priceNet: 850, vatRate: 0.2, lineTotal: 1020, confidence: 0.89 },
         ],
+      };
+    }
+
+    // Try to extract docNumber and docDate from Expense_<num>_<DD.MM.YYYY>.pdf pattern
+    const parsed = parseExpenseFilename(fileName);
+    if (parsed) {
+      return {
+        docNumber: parsed.docNumber,
+        docDate: parsed.docDate,
+        lines: [],
       };
     }
 

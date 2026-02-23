@@ -1,14 +1,40 @@
 import { useMemo, useState } from 'react';
-import { AppData } from '../types';
+import { AppData, ImportJobStatus } from '../types';
 import { MockExtractor, createImportJob, createReceiptDraft, hashFile, mapImportLine, postReceiptDraft, processImportJob, validateImportLine } from '../services/imports';
+
+const STATUS_OPTIONS: { value: '' | ImportJobStatus; label: string }[] = [
+  { value: '', label: 'Всі статуси' },
+  { value: 'DONE', label: 'Виконано' },
+  { value: 'FAILED', label: 'Помилка' },
+  { value: 'PROCESSING', label: 'Обробляється' },
+  { value: 'QUEUED', label: 'В черзі' },
+];
 
 export default function DocumentImports({ data, updateData }: { data: AppData; updateData: (patch: Partial<AppData>) => void }) {
   const [selectedJobId, setSelectedJobId] = useState<string | null>(data.importJobs[0]?.id || null);
   const [busy, setBusy] = useState(false);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'' | ImportJobStatus>('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const extractor = useMemo(() => new MockExtractor(), []);
 
   const selectedJob = data.importJobs.find(j => j.id === selectedJobId) || null;
   const selectedDraft = selectedJob ? data.receiptDrafts.find(d => d.importJobId === selectedJob.id) : undefined;
+
+  const filteredJobs = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return data.importJobs.filter(job => {
+      if (statusFilter && job.status !== statusFilter) return false;
+      if (dateFrom && job.docDate && job.docDate < dateFrom) return false;
+      if (dateTo && job.docDate && job.docDate > dateTo) return false;
+      if (q) {
+        const haystack = `${job.sourceFilename} ${job.docNumber || ''}`.toLowerCase();
+        if (!haystack.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [data.importJobs, search, statusFilter, dateFrom, dateTo]);
 
   const onUpload = async (file?: File) => {
     if (!file) return;
@@ -64,10 +90,31 @@ export default function DocumentImports({ data, updateData }: { data: AppData; u
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="bg-white rounded-2xl border p-4 space-y-2">
           <h3 className="font-semibold">Імпорти</h3>
-          {data.importJobs.map(job => (
+          <div className="space-y-2 mb-2">
+            <input
+              type="text"
+              placeholder="Пошук за файлом або номером"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="w-full border rounded-lg px-2 py-1 text-sm"
+            />
+            <select
+              value={statusFilter}
+              onChange={e => setStatusFilter(e.target.value as '' | ImportJobStatus)}
+              className="w-full border rounded-lg px-2 py-1 text-sm"
+            >
+              {STATUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+            <div className="flex gap-1">
+              <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="flex-1 border rounded-lg px-2 py-1 text-xs" title="Дата від" />
+              <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="flex-1 border rounded-lg px-2 py-1 text-xs" title="Дата до" />
+            </div>
+          </div>
+          {filteredJobs.length === 0 && <p className="text-xs text-neutral-400">Нічого не знайдено</p>}
+          {filteredJobs.map(job => (
             <button key={job.id} onClick={() => setSelectedJobId(job.id)} className={`w-full text-left rounded-lg border p-3 ${selectedJobId === job.id ? 'border-blue-500 bg-blue-50' : 'border-neutral-200'}`}>
               <div className="font-medium text-sm">{job.sourceFilename}</div>
-              <div className="text-xs text-neutral-500">{job.status}</div>
+              <div className="text-xs text-neutral-500">{job.status}{job.docDate ? ` · ${job.docDate}` : ''}</div>
             </button>
           ))}
         </div>
