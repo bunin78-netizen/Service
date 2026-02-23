@@ -35,6 +35,33 @@ test('validateRows catches invalid numbers', () => {
   assert.equal(errors.length, 2);
 });
 
+test('postImportPreview respects mapping parser options for CSV delimiter', async () => {
+  const data = JSON.parse(JSON.stringify(baseData));
+  upsertImportMapping(data, {
+    supplier_id: 's1',
+    file_type: 'csv',
+    header_row: 1,
+    columns: {
+      document_number: ['doc no'],
+      product_name: ['name'],
+      quantity: ['qty'],
+      price_gross: ['total'],
+    },
+    options: {
+      delimiter: '|',
+    },
+  });
+
+  const f = new File([
+    'Doc No|Name|Qty|Total\nINV-1|Oil|2|100',
+  ], 'omega.csv');
+
+  const preview = await postImportPreview(data, f);
+  assert.equal(preview.ok, true);
+  assert.equal(preview.data?.items.length, 1);
+  assert.equal(preview.data?.items[0].product_name, 'Oil');
+});
+
 test('integration preview on provided sample files (if available)', async (t) => {
   const files = [
     '/mnt/data/Expense_0140718_22.01.2026.xlsx',
