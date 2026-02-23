@@ -226,7 +226,10 @@ const INITIAL_DATA: AppData = {
     notifyNewClient: true,
     sendFiscalReceipts: true,
     welcomeMessage: 'Вітаємо в SmartKharkov! 🚗 Ми допоможемо вам з ремонтом та обслуговуванням вашого авто.',
-  }
+  },
+  importJobs: [],
+  receiptDrafts: [],
+  supplierProductMap: [],
 };
 
 export function loadData(): AppData {
@@ -241,6 +244,9 @@ export function loadData(): AppData {
       notifications: parsed.notifications || INITIAL_DATA.notifications,
       currentUserId: parsed.currentUserId || INITIAL_DATA.currentUserId,
       warehouseDocuments: parsed.warehouseDocuments || INITIAL_DATA.warehouseDocuments,
+      importJobs: parsed.importJobs || INITIAL_DATA.importJobs,
+      receiptDrafts: parsed.receiptDrafts || INITIAL_DATA.receiptDrafts,
+      supplierProductMap: parsed.supplierProductMap || INITIAL_DATA.supplierProductMap,
     };
   }
   return INITIAL_DATA;

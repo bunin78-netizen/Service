@@ -1,0 +1,136 @@
+import { useMemo, useState } from 'react';
+import { AppData } from '../types';
+import { MockExtractor, createImportJob, createReceiptDraft, hashFile, mapImportLine, postReceiptDraft, processImportJob, validateImportLine } from '../services/imports';
+
+export default function DocumentImports({ data, updateData }: { data: AppData; updateData: (patch: Partial<AppData>) => void }) {
+  const [selectedJobId, setSelectedJobId] = useState<string | null>(data.importJobs[0]?.id || null);
+  const [busy, setBusy] = useState(false);
+  const extractor = useMemo(() => new MockExtractor(), []);
+
+  const selectedJob = data.importJobs.find(j => j.id === selectedJobId) || null;
+  const selectedDraft = selectedJob ? data.receiptDrafts.find(d => d.importJobId === selectedJob.id) : undefined;
+
+  const onUpload = async (file?: File) => {
+    if (!file) return;
+    setBusy(true);
+    try {
+      const fileHash = await hashFile(file);
+      const job = createImportJob(data, { filename: file.name, fileHash, filePath: file.name, createdBy: data.currentUserId || 'u1' });
+      const withJob: AppData = { ...data, importJobs: [job, ...data.importJobs] };
+      const processed = await processImportJob(withJob, job.id, extractor);
+      updateData({ importJobs: processed.importJobs });
+      setSelectedJobId(job.id);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Не вдалося завантажити файл');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onMapLine = (lineId: string, productId: string) => {
+    if (!selectedJob) return;
+    const next = mapImportLine(data, selectedJob.id, lineId, productId);
+    updateData({ importJobs: next.importJobs, supplierProductMap: next.supplierProductMap });
+  };
+
+  const onCreateDraft = () => {
+    if (!selectedJob) return;
+    const next = createReceiptDraft(data, selectedJob.id);
+    updateData({ receiptDrafts: next.receiptDrafts });
+  };
+
+  const onPost = () => {
+    if (!selectedDraft) return;
+    try {
+      const next = postReceiptDraft(data, selectedDraft.id);
+      updateData({
+        inventory: next.inventory,
+        warehouseDocuments: next.warehouseDocuments,
+        receiptDrafts: next.receiptDrafts,
+      });
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Не вдалося провести документ');
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="bg-white p-6 rounded-2xl border shadow-sm">
+        <h2 className="text-xl font-bold mb-3">Імпорт документів постачальника (PDF)</h2>
+        <input type="file" accept="application/pdf" disabled={busy} onChange={(e) => onUpload(e.target.files?.[0])} className="block w-full text-sm" />
+        <p className="text-xs text-neutral-500 mt-2">Для демо використайте файл з назвою: Expense_0318580_19.02.2026.pdf</p>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="bg-white rounded-2xl border p-4 space-y-2">
+          <h3 className="font-semibold">Імпорти</h3>
+          {data.importJobs.map(job => (
+            <button key={job.id} onClick={() => setSelectedJobId(job.id)} className={`w-full text-left rounded-lg border p-3 ${selectedJobId === job.id ? 'border-blue-500 bg-blue-50' : 'border-neutral-200'}`}>
+              <div className="font-medium text-sm">{job.sourceFilename}</div>
+              <div className="text-xs text-neutral-500">{job.status}</div>
+            </button>
+          ))}
+        </div>
+
+        <div className="lg:col-span-2 bg-white rounded-2xl border p-4">
+          {!selectedJob && <p className="text-sm text-neutral-500">Оберіть імпорт.</p>}
+          {selectedJob && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-semibold">Документ № {selectedJob.docNumber || '—'}</h3>
+                  <p className="text-xs text-neutral-500">Статус: {selectedJob.status}. Дата: {selectedJob.docDate || '—'}</p>
+                </div>
+                <div className="space-x-2">
+                  <button onClick={onCreateDraft} disabled={selectedJob.status !== 'DONE'} className="px-3 py-2 rounded-lg bg-indigo-600 text-white text-sm disabled:opacity-40">Створити черновик</button>
+                  <button onClick={onPost} disabled={!selectedDraft || selectedDraft.status === 'POSTED'} className="px-3 py-2 rounded-lg bg-emerald-600 text-white text-sm disabled:opacity-40">Провести</button>
+                </div>
+              </div>
+
+              <div className="overflow-auto border rounded-lg">
+                <table className="w-full text-sm">
+                  <thead className="bg-neutral-50">
+                    <tr>
+                      <th className="p-2 text-left">Найменування</th>
+                      <th className="p-2 text-left">К-сть</th>
+                      <th className="p-2 text-left">Ціна</th>
+                      <th className="p-2 text-left">ПДВ</th>
+                      <th className="p-2 text-left">Confidence</th>
+                      <th className="p-2 text-left">Товар</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {selectedJob.lines.map(line => {
+                      const invalid = validateImportLine(line).length > 0;
+                      return (
+                        <tr key={line.id} className={`${line.confidence < 0.9 || invalid ? 'bg-amber-50' : ''}`}>
+                          <td className="p-2">{line.nameRaw}</td>
+                          <td className="p-2">{line.qty}</td>
+                          <td className="p-2">{line.priceGross.toFixed(2)}</td>
+                          <td className="p-2">{(line.vatRate * 100).toFixed(0)}%</td>
+                          <td className="p-2">{line.confidence.toFixed(2)}</td>
+                          <td className="p-2">
+                            <select className="border rounded p-1" value={line.matchedProductId || ''} onChange={(e) => onMapLine(line.id, e.target.value)}>
+                              <option value="">Не зіставлено</option>
+                              {data.inventory.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                            </select>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {selectedDraft && (
+                <div className="text-sm rounded-lg bg-neutral-50 border p-3">
+                  Черновик: <b>{selectedDraft.status}</b>, сума: {selectedDraft.totalGross.toFixed(2)} грн
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

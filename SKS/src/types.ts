@@ -210,4 +210,82 @@ export type AppData = {
   telegramSettings: TelegramSettings;
   viberSettings: ViberSettings;
   warehouseDocuments: WarehouseDocument[];
+  importJobs: ImportJob[];
+  receiptDrafts: ReceiptDraft[];
+  supplierProductMap: SupplierProductMap[];
+};
+
+export type ImportJobStatus = 'QUEUED' | 'PROCESSING' | 'DONE' | 'FAILED';
+
+export type ImportJob = {
+  id: string;
+  status: ImportJobStatus;
+  sourceFilename: string;
+  filePath: string;
+  fileHash: string;
+  supplierId?: string;
+  docNumber?: string;
+  docDate?: string;
+  rawExtractionJson?: unknown;
+  errorMessage?: string;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+  lines: ImportLine[];
+};
+
+export type ImportLine = {
+  id: string;
+  importJobId: string;
+  nameRaw: string;
+  supplierSkuRaw?: string;
+  barcodeRaw?: string;
+  qty: number;
+  unit: string;
+  priceNet: number;
+  priceGross: number;
+  vatRate: number;
+  lineTotal: number;
+  confidence: number;
+  page?: number;
+  bbox?: { x: number; y: number; width: number; height: number };
+  matchedProductId?: string;
+};
+
+export type SupplierProductMap = {
+  supplierId: string;
+  supplierSku?: string;
+  barcode?: string;
+  productId: string;
+  updatedAt: string;
+};
+
+export type ReceiptDraftStatus = 'DRAFT' | 'POSTED';
+
+export type ReceiptDraft = {
+  id: string;
+  importJobId: string;
+  supplierId?: string;
+  warehouseId: string;
+  status: ReceiptDraftStatus;
+  totalNet: number;
+  totalVat: number;
+  totalGross: number;
+  lines: ReceiptDraftLine[];
+  postedDocumentId?: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ReceiptDraftLine = {
+  id: string;
+  draftId: string;
+  productId?: string;
+  name: string;
+  qty: number;
+  unit: string;
+  price: number;
+  vatRate: number;
+  lineTotal: number;
+  sourceImportLineId: string;
 };

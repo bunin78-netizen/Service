@@ -42,6 +42,7 @@ import RROPage from './pages/RRO';
 import Login from './pages/Login';
 import WarehouseDocuments from './pages/WarehouseDocuments';
 import DiagnosisPage from './pages/Diagnosis';
+import DocumentImports from './pages/DocumentImports';
 import { sendTelegramNotification } from './pages/Telegram';
 import { sendViberNotification } from './pages/Viber';
 
@@ -201,6 +202,7 @@ export function App() {
       items: [
         { id: 'inventory', label: 'Склад', icon: Package },
         { id: 'warehousedocs', label: 'Складські документи', icon: Receipt },
+        { id: 'docimports', label: 'Імпорт документів', icon: Receipt },
         { id: 'suppliershop', label: 'Замовлення запчастин', icon: ShoppingBag },
         { id: 'database', label: 'Бази даних', icon: Database },
       ],
@@ -240,6 +242,7 @@ export function App() {
       case 'clients': return <Clients data={data} updateData={updateData} addNotification={addNotification} />;
       case 'inventory': return <Inventory data={data} updateData={updateData} />;
       case 'warehousedocs': return <WarehouseDocuments data={data} updateData={updateData} />;
+      case 'docimports': return <DocumentImports data={data} updateData={updateData} />;
       case 'workorders': return <WorkOrders data={data} updateData={updateData} addNotification={addNotification} />;
       case 'diagnosis': return <DiagnosisPage data={data} updateData={updateData} />;
       case 'suppliershop': return <SupplierShop data={data} updateData={updateData} />;
