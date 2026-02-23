@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { AppData, Expense } from '../types';
-import { Plus, Trash2, Wallet, Tag, X, Save } from 'lucide-react';
+import { Plus, Trash2, Wallet, Tag, X, Save, Printer } from 'lucide-react';
 import { format } from 'date-fns';
 import { generateId } from '../store';
 
@@ -21,9 +21,15 @@ export default function Expenses({ data, updateData }: { data: AppData, updateDa
   const handleSave = () => {
     if (!formData.category || formData.amount <= 0) return;
 
+    const nextNumber = data.expenses.reduce((max, e) => {
+      const m = e.cashOrderNumber?.match(/^РКО-(\d+)$/);
+      return m ? Math.max(max, parseInt(m[1], 10)) : max;
+    }, 0) + 1;
+
     const newExpense: Expense = {
       id: generateId(),
       ...formData,
+      cashOrderNumber: `РКО-${String(nextNumber).padStart(4, '0')}`,
     };
     updateData({ expenses: [newExpense, ...data.expenses] });
     setShowModal(false);
@@ -38,6 +44,52 @@ export default function Expenses({ data, updateData }: { data: AppData, updateDa
   const handleDelete = (id: string) => {
     if (!confirm('Видалити витрату?')) return;
     updateData({ expenses: data.expenses.filter(e => e.id !== id) });
+  };
+
+  const handlePrint = (expense: Expense) => {
+    const companySettings = data.companySettings;
+    const escapeHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) { alert('Дозвольте спливаючі вікна у браузері для друку документа.'); return; }
+    printWindow.document.write(`<html><head><title>РКО ${escapeHtml(expense.cashOrderNumber || '')}</title>
+    <style>
+      body{font-family:Arial,sans-serif;padding:40px;color:#333;max-width:700px;margin:0 auto}
+      .header{display:flex;justify-content:space-between;border-bottom:3px solid #ffcc00;padding-bottom:16px;margin-bottom:16px}
+      .company{font-size:20px;font-weight:bold}
+      .info{font-size:11px;color:#666}
+      .title{text-align:center;font-size:16px;font-weight:bold;text-transform:uppercase;margin:16px 0}
+      .meta{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;font-size:13px;background:#f9f9f9;padding:12px;border-radius:8px}
+      .amount-row{font-size:15px;font-weight:bold;border:1px solid #ddd;padding:10px 14px;border-radius:6px;margin-bottom:16px}
+      .footer{margin-top:40px;display:flex;justify-content:space-between}
+      .sig{width:180px;border-top:1px solid #000;text-align:center;font-size:11px;padding-top:4px}
+      @media print{body{padding:20px}}
+    </style></head><body>
+    <div class="header">
+      <div>
+        <div class="company">${escapeHtml(companySettings.name)}</div>
+        <div class="info">${escapeHtml(companySettings.address)}<br>Тел: ${escapeHtml(companySettings.phone)}<br>ЄДРПОУ: ${escapeHtml(companySettings.edrpou)}</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-weight:bold">РОЗХІДНИЙ КАСОВИЙ ОРДЕР № ${escapeHtml(expense.cashOrderNumber || '—')}</div>
+        <div style="font-size:13px">від ${escapeHtml(expense.date.split('-').reverse().join('.'))}</div>
+      </div>
+    </div>
+    <div class="title">Розхідний касовий ордер</div>
+    <div class="meta">
+      <div><strong>Номер ордера:</strong> ${escapeHtml(expense.cashOrderNumber || '—')}</div>
+      <div><strong>Дата:</strong> ${escapeHtml(expense.date.split('-').reverse().join('.'))}</div>
+      <div><strong>Категорія:</strong> ${escapeHtml(expense.category)}</div>
+      <div><strong>Підстава:</strong> ${escapeHtml(expense.description || '—')}</div>
+    </div>
+    <div class="amount-row">Видано: <span style="font-size:18px">${expense.amount.toLocaleString()} ₴</span></div>
+    <div class="footer">
+      <div class="sig">Керівник<br>(${escapeHtml(companySettings.managerName || companySettings.name)})</div>
+      <div class="sig">Касир<br>&nbsp;</div>
+      <div class="sig">Одержав<br>&nbsp;</div>
+    </div>
+    </body></html>`);
+    printWindow.document.close();
+    printWindow.print();
   };
 
   return (
@@ -79,6 +131,7 @@ export default function Expenses({ data, updateData }: { data: AppData, updateDa
           <table className="w-full text-left">
             <thead>
               <tr className="bg-neutral-50 text-neutral-500 text-[10px] uppercase font-bold tracking-wider border-b">
+                <th className="px-6 py-4">РКО №</th>
                 <th className="px-6 py-4">Дата</th>
                 <th className="px-6 py-4">Категорія</th>
                 <th className="px-6 py-4">Опис</th>
@@ -89,6 +142,15 @@ export default function Expenses({ data, updateData }: { data: AppData, updateDa
             <tbody className="divide-y text-sm">
               {data.expenses.map(expense => (
                 <tr key={expense.id} className="hover:bg-neutral-50 transition-colors">
+                  <td className="px-6 py-4">
+                    {expense.cashOrderNumber ? (
+                      <span className="px-2 py-0.5 bg-yellow-100 text-yellow-800 rounded font-mono text-xs font-bold">
+                        {expense.cashOrderNumber}
+                      </span>
+                    ) : (
+                      <span className="text-neutral-300 text-xs">—</span>
+                    )}
+                  </td>
                   <td className="px-6 py-4 text-neutral-500">{format(new Date(expense.date), 'dd.MM.yyyy')}</td>
                   <td className="px-6 py-4">
                     <span className="px-3 py-1 bg-neutral-100 rounded-full text-xs font-bold text-neutral-600">
@@ -97,7 +159,16 @@ export default function Expenses({ data, updateData }: { data: AppData, updateDa
                   </td>
                   <td className="px-6 py-4 font-medium text-neutral-800">{expense.description}</td>
                   <td className="px-6 py-4 text-right font-bold text-red-600">-{expense.amount.toLocaleString()} ₴</td>
-                  <td className="px-6 py-4 text-right">
+                  <td className="px-6 py-4 text-right flex items-center justify-end gap-1">
+                    {expense.cashOrderNumber && (
+                      <button
+                        onClick={() => handlePrint(expense)}
+                        className="text-neutral-400 hover:text-green-600 p-2"
+                        title="Друк РКО"
+                      >
+                        <Printer size={16} />
+                      </button>
+                    )}
                     {currentUser?.permissions.canDeleteOrders && (
                     <button 
                       onClick={() => handleDelete(expense.id)}
