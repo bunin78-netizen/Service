@@ -17,6 +17,7 @@ export default function Telegram({ data, onSave }: Props) {
     notifyLowStock: true,
     notifyPaymentReceived: true,
     notifyNewClient: true,
+    sendReceipts: false,
     welcomeMessage: 'Вітаємо в SmartKharkov! 🚗',
   });
   const [testStatus, setTestStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
@@ -304,6 +305,22 @@ export default function Telegram({ data, onSave }: Props) {
                 className="w-5 h-5 text-yellow-500 rounded focus:ring-yellow-500"
               />
             </label>
+
+            <label className="flex items-center justify-between p-4 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100">
+              <div className="flex items-center gap-3">
+                <FileText className="w-5 h-5 text-yellow-500" />
+                <div>
+                  <span className="font-medium">Відправка чеків клієнтам</span>
+                  <p className="text-xs text-gray-500">Надсилати чек у Telegram після оплати замовлення</p>
+                </div>
+              </div>
+              <input
+                type="checkbox"
+                checked={settings.sendReceipts}
+                onChange={(e) => updateSettings({ ...settings, sendReceipts: e.target.checked })}
+                className="w-5 h-5 text-yellow-500 rounded focus:ring-yellow-500"
+              />
+            </label>
           </div>
         </div>
       </div>
@@ -340,6 +357,10 @@ export default function Telegram({ data, onSave }: Props) {
             <div className="p-3 bg-gray-50 rounded-lg">
               <code className="text-blue-600 font-mono">/history</code>
               <p className="text-sm text-gray-600 mt-1">Історія обслуговувань</p>
+            </div>
+            <div className="p-3 bg-gray-50 rounded-lg">
+              <code className="text-blue-600 font-mono">/receipt [номер замовлення]</code>
+              <p className="text-sm text-gray-600 mt-1">Отримати чек по замовленню</p>
             </div>
           </div>
         </div>
@@ -487,6 +508,85 @@ export async function sendTelegramNotification(
     return result.ok;
   } catch (error) {
     console.error('Telegram notification error:', error);
+    return false;
+  }
+}
+
+// Export function to send receipts to clients via Telegram
+export async function sendTelegramReceipt(
+  settings: TelegramSettings,
+  receipt: {
+    orderId: string;
+    clientName: string;
+    carInfo: string;
+    services: { name: string; price: number }[];
+    parts: { name: string; quantity: number; price: number }[];
+    total: number;
+    paymentType: 'Cash' | 'Card' | 'Bank';
+    date: string;
+    companyName: string;
+  },
+  chatId?: string
+): Promise<boolean> {
+  if (!settings.enabled || !settings.botToken) return false;
+  if (!settings.sendReceipts) return false;
+
+  const targetChatId = chatId || settings.chatId;
+  if (!targetChatId) return false;
+
+  const payLabel =
+    receipt.paymentType === 'Cash' ? 'Готівка 💵' :
+    receipt.paymentType === 'Card' ? 'Карта 💳' : 'Безготівковий 🏦';
+
+  const serviceLines = receipt.services
+    .map(s => `  • ${s.name} — ${s.price.toLocaleString()} ₴`)
+    .join('\n');
+  const partLines = receipt.parts
+    .map(p => `  • ${p.name} ×${p.quantity} — ${(p.price * p.quantity).toLocaleString()} ₴`)
+    .join('\n');
+
+  const itemsSection = [
+    serviceLines && `*Роботи:*\n${serviceLines}`,
+    partLines && `*Запчастини:*\n${partLines}`,
+  ]
+    .filter(Boolean)
+    .join('\n');
+
+  const message = [
+    `🧾 *Чек — ${receipt.companyName}*`,
+    ``,
+    `📋 Замовлення: *${receipt.orderId}*`,
+    `👤 Клієнт: ${receipt.clientName}`,
+    `🚗 Авто: ${receipt.carInfo}`,
+    `📅 Дата: ${receipt.date}`,
+    ``,
+    itemsSection,
+    ``,
+    `💰 *Сума: ${receipt.total.toLocaleString()} ₴*`,
+    `💳 Спосіб оплати: ${payLabel}`,
+    ``,
+    `✅ *Оплачено. Дякуємо за звернення!*`,
+  ]
+    .filter(Boolean)
+    .join('\n');
+
+  try {
+    const response = await fetch(
+      `https://api.telegram.org/bot${settings.botToken}/sendMessage`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: targetChatId,
+          text: message,
+          parse_mode: 'Markdown',
+        }),
+      }
+    );
+    const result = await response.json();
+    return result.ok;
+  } catch (error) {
+    console.error('Telegram receipt send error:', error);
     return false;
   }
 }
