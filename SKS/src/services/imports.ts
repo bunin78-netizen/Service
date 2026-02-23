@@ -31,6 +31,30 @@ function detectSeparator(firstLine: string): string {
   return Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0];
 }
 
+/** Parse a single CSV line into cells, handling RFC 4180 quoted fields */
+function parseCsvLine(line: string, sep: string): string[] {
+  const result: string[] = [];
+  let current = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (inQuotes) {
+      if (ch === '"') {
+        if (line[i + 1] === '"') { current += '"'; i++; }
+        else inQuotes = false;
+      } else {
+        current += ch;
+      }
+    } else {
+      if (ch === '"') { inQuotes = true; }
+      else if (ch === sep) { result.push(current.trim()); current = ''; }
+      else { current += ch; }
+    }
+  }
+  result.push(current.trim());
+  return result;
+}
+
 /** Map a header name to a canonical field key */
 function mapHeader(h: string): string {
   const s = h.trim().toLowerCase();
@@ -106,10 +130,11 @@ export class ExcelCsvExtractor implements DocumentExtractor {
     let rows: unknown[][];
 
     if (file.name.toLowerCase().endsWith('.csv')) {
-      const text = new TextDecoder('utf-8').decode(arrayBuffer);
+      // Strip UTF-8 BOM if present so header field matching is not broken
+      const text = new TextDecoder('utf-8').decode(arrayBuffer).replace(/^\uFEFF/, '');
       const allRows = text.split(/\r?\n/).filter(l => l.trim());
       const sep = detectSeparator(allRows[0] || '');
-      rows = allRows.map(line => line.split(sep).map(cell => cell.replace(/^"|"$/g, '').trim()));
+      rows = allRows.map(line => parseCsvLine(line, sep));
     } else {
       const workbook = XLSX.read(arrayBuffer, { type: 'array' });
       const sheet = workbook.Sheets[workbook.SheetNames[0]];
