@@ -61,6 +61,28 @@ type ShiftState = {
 
 const PROVIDERS: RROProvider[] = [
   {
+    id: 'privatbank',
+    name: 'privatbank',
+    displayName: 'ПриватБанк Еквайринг',
+    logo: '🏦',
+    color: '#16a34a',
+    website: 'https://privatbank.ua/business/ekvajryng',
+    description: 'Інтеграція з еквайрингом ПриватБанку для прийому карткових оплат та безготівкових платежів у звʼязці з ПРРО.',
+    apiEndpoint: 'https://api.privatbank.ua/p24api',
+    features: ['Оплата карткою', 'Підтвердження транзакцій', 'Платежі за QR', 'API інтеграція', 'Підтримка бізнес-рахунків'],
+  },
+  {
+    id: 'monobank',
+    name: 'monobank',
+    displayName: 'Monobank Еквайринг',
+    logo: '🖤',
+    color: '#111827',
+    website: 'https://monobank.ua/acquiring',
+    description: 'Інтеграція з Monobank для онлайн/офлайн прийому оплат, роботи з інвойсами та перевірки статусів платежів.',
+    apiEndpoint: 'https://api.monobank.ua',
+    features: ['Інвойси mono', 'Webhooks подій', 'Швидкі виплати', 'Оплата через QR', 'API для автоматизації'],
+  },
+  {
     id: 'checkbox',
     name: 'checkbox',
     displayName: 'Checkbox',
