@@ -10,13 +10,20 @@ const STATUS_OPTIONS: { value: '' | ImportJobStatus; label: string }[] = [
   { value: 'QUEUED', label: 'В черзі' },
 ];
 
+type PendingImport = {
+  processedData: AppData;
+  jobId: string;
+  originalInventoryLength: number;
+};
+
 export default function DocumentImports({ data, updateData }: { data: AppData; updateData: (patch: Partial<AppData>) => void }) {
   const [selectedJobId, setSelectedJobId] = useState<string | null>(data.importJobs[0]?.id || null);
   const [busy, setBusy] = useState(false);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'' | ImportJobStatus>('');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
+  const [pendingImport, setPendingImport] = useState<PendingImport | null>(null);
+  const [pendingSupplier, setPendingSupplier] = useState('');
+  const [pendingCategory, setPendingCategory] = useState('');
   const pdfExtractor = useMemo(() => new MockExtractor(), []);
   const excelCsvExtractor = useMemo(() => new ExcelCsvExtractor(), []);
   const xmlExtractor = useMemo(() => new XmlExtractor(), []);
@@ -31,15 +38,13 @@ export default function DocumentImports({ data, updateData }: { data: AppData; u
     const q = search.trim().toLowerCase();
     return data.importJobs.filter(job => {
       if (statusFilter && job.status !== statusFilter) return false;
-      if (dateFrom && job.docDate && job.docDate < dateFrom) return false;
-      if (dateTo && job.docDate && job.docDate > dateTo) return false;
       if (q) {
         const haystack = `${job.sourceFilename} ${job.docNumber || ''}`.toLowerCase();
         if (!haystack.includes(q)) return false;
       }
       return true;
     });
-  }, [data.importJobs, search, statusFilter, dateFrom, dateTo]);
+  }, [data.importJobs, search, statusFilter]);
 
   const onUpload = async (file?: File) => {
     if (!file) return;
@@ -55,13 +60,54 @@ export default function DocumentImports({ data, updateData }: { data: AppData; u
       const job = createImportJob(data, { filename: file.name, fileHash, filePath: file.name, createdBy: data.currentUserId || 'u1' });
       const withJob: AppData = { ...data, importJobs: [job, ...data.importJobs] };
       const processed = await processImportJob(withJob, job.id, extractor, file);
-      updateData({ importJobs: processed.importJobs, inventory: processed.inventory, supplierProductMap: processed.supplierProductMap });
-      setSelectedJobId(job.id);
+      const processedJob = processed.importJobs.find(j => j.id === job.id);
+      if (processedJob && processedJob.status === 'DONE' && !processedJob.supplierId) {
+        setPendingImport({ processedData: processed, jobId: job.id, originalInventoryLength: data.inventory.length });
+        setPendingSupplier(data.suppliers[0]?.id || '');
+        setPendingCategory(data.categories[0]?.name || '');
+        setSelectedJobId(job.id);
+      } else {
+        updateData({ importJobs: processed.importJobs, inventory: processed.inventory, supplierProductMap: processed.supplierProductMap });
+        setSelectedJobId(job.id);
+      }
     } catch (e) {
       alert(e instanceof Error ? e.message : 'Не вдалося завантажити файл');
     } finally {
       setBusy(false);
     }
+  };
+
+  const onConfirmPendingImport = () => {
+    if (!pendingImport) return;
+    const { processedData, jobId, originalInventoryLength } = pendingImport;
+    const importJobs = processedData.importJobs.map(j =>
+      j.id === jobId ? { ...j, supplierId: pendingSupplier } : j
+    );
+    const inventory = [
+      ...processedData.inventory.slice(0, originalInventoryLength),
+      ...processedData.inventory.slice(originalInventoryLength).map(p => ({
+        ...p,
+        supplierId: pendingSupplier,
+        category: pendingCategory,
+      })),
+    ];
+    const job = processedData.importJobs.find(j => j.id === jobId);
+    const now = new Date().toISOString();
+    const newMappings = (job?.lines || [])
+      .filter(l => l.matchedProductId && (l.supplierSkuRaw || l.barcodeRaw))
+      .map(l => ({
+        supplierId: pendingSupplier,
+        supplierSku: l.supplierSkuRaw,
+        barcode: l.barcodeRaw,
+        productId: l.matchedProductId!,
+        updatedAt: now,
+      }));
+    updateData({
+      importJobs,
+      inventory,
+      supplierProductMap: [...processedData.supplierProductMap, ...newMappings],
+    });
+    setPendingImport(null);
   };
 
   const onMapLine = (lineId: string, productId: string) => {
@@ -79,12 +125,18 @@ export default function DocumentImports({ data, updateData }: { data: AppData; u
   const onPost = () => {
     if (!selectedDraft) return;
     try {
+      const deletedJobId = selectedDraft.importJobId;
       const next = postReceiptDraft(data, selectedDraft.id);
       updateData({
         inventory: next.inventory,
         warehouseDocuments: next.warehouseDocuments,
         receiptDrafts: next.receiptDrafts,
+        importJobs: next.importJobs,
       });
+      const deletedIndex = data.importJobs.findIndex(j => j.id === deletedJobId);
+      const neighborId = data.importJobs[deletedIndex + 1]?.id || data.importJobs[deletedIndex - 1]?.id || null;
+      const fallback = next.importJobs.find(j => j.id === neighborId) || next.importJobs[0] || null;
+      setSelectedJobId(fallback?.id || null);
     } catch (e) {
       alert(e instanceof Error ? e.message : 'Не вдалося провести документ');
     }
@@ -107,6 +159,41 @@ export default function DocumentImports({ data, updateData }: { data: AppData; u
 
   return (
     <div className="space-y-6">
+      {pendingImport && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm space-y-4">
+            <h3 className="font-bold text-lg">Постачальника не розпізнано</h3>
+            <p className="text-sm text-neutral-600">Оберіть постачальника та категорію товарів для імпортованого документа.</p>
+            <div>
+              <label className="block text-sm font-medium mb-1">Постачальник</label>
+              <select
+                value={pendingSupplier}
+                onChange={e => setPendingSupplier(e.target.value)}
+                className="w-full border rounded-lg px-3 py-2 text-sm"
+              >
+                <option value="">— оберіть —</option>
+                {data.suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Категорія товару</label>
+              <select
+                value={pendingCategory}
+                onChange={e => setPendingCategory(e.target.value)}
+                className="w-full border rounded-lg px-3 py-2 text-sm"
+              >
+                <option value="">— оберіть —</option>
+                {data.categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+              </select>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setPendingImport(null)} className="px-4 py-2 rounded-lg border text-sm">Скасувати</button>
+              <button onClick={onConfirmPendingImport} disabled={!pendingSupplier} className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm disabled:opacity-40">Підтвердити</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="bg-white p-6 rounded-2xl border shadow-sm">
         <h2 className="text-xl font-bold mb-3">Імпорт документів постачальника</h2>
         <input type="file" accept="application/pdf,.xlsx,.xls,.csv,.xml,text/csv,text/xml,application/xml" disabled={busy} onChange={(e) => onUpload(e.target.files?.[0])} className="block w-full text-sm" />
@@ -131,10 +218,6 @@ export default function DocumentImports({ data, updateData }: { data: AppData; u
             >
               {STATUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
-            <div className="flex gap-1">
-              <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="flex-1 border rounded-lg px-2 py-1 text-xs" title="Дата від" />
-              <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="flex-1 border rounded-lg px-2 py-1 text-xs" title="Дата до" />
-            </div>
           </div>
           {filteredJobs.length === 0 && <p className="text-xs text-neutral-400">Нічого не знайдено</p>}
           {filteredJobs.map(job => (

@@ -522,6 +522,7 @@ export function postReceiptDraft(data: AppData, draftId: string): AppData {
     inventory,
     receiptDrafts,
     warehouseDocuments: [warehouseDocument, ...data.warehouseDocuments],
+    importJobs: data.importJobs.filter(j => j.id !== draft.importJobId),
   };
 }
 
