@@ -41,6 +41,7 @@ import SupplierShop from './pages/SupplierShop';
 import RROPage from './pages/RRO';
 import Login from './pages/Login';
 import WarehouseDocuments from './pages/WarehouseDocuments';
+import DiagnosisPage from './pages/Diagnosis';
 import { sendTelegramNotification } from './pages/Telegram';
 import { sendViberNotification } from './pages/Viber';
 
@@ -240,7 +241,7 @@ export function App() {
       case 'inventory': return <Inventory data={data} updateData={updateData} />;
       case 'warehousedocs': return <WarehouseDocuments data={data} updateData={updateData} />;
       case 'workorders': return <WorkOrders data={data} updateData={updateData} addNotification={addNotification} />;
-      case 'diagnosis': return <WorkOrders data={data} updateData={updateData} addNotification={addNotification} openDiagnosisByDefault />;
+      case 'diagnosis': return <DiagnosisPage data={data} updateData={updateData} />;
       case 'suppliershop': return <SupplierShop data={data} updateData={updateData} />;
       case 'salary': return isAdmin ? <Salary data={data} /> : accessDenied;
       case 'reports': return isAdmin ? <Reports data={data} /> : accessDenied;

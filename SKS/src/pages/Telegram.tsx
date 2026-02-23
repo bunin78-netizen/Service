@@ -892,3 +892,74 @@ export async function sendTelegramApprovalRequest(
     return false;
   }
 }
+
+// Export function to send diagnostic card to client via Telegram
+export async function sendTelegramDiagnosticCard(
+  settings: TelegramSettings,
+  card: {
+    orderId: string;
+    clientName: string;
+    carInfo: string;
+    date: string;
+    masterName: string;
+    companyName: string;
+    companyPhone: string;
+    items: {
+      label: string;
+      status: 'ok' | 'warn' | 'crit';
+      note: string;
+    }[];
+  },
+  chatId?: string
+): Promise<boolean> {
+  if (!settings.enabled || !settings.botToken) return false;
+
+  const targetChatId = chatId || settings.chatId;
+  if (!targetChatId) return false;
+
+  const statusEmoji = (s: 'ok' | 'warn' | 'crit') =>
+    s === 'ok' ? '✅' : s === 'warn' ? '⚠️' : '🔴';
+  const statusLabel = (s: 'ok' | 'warn' | 'crit') =>
+    s === 'ok' ? 'НОРМА' : s === 'warn' ? 'УВАГА' : 'КРИТИЧНО';
+
+  const itemLines = card.items
+    .map(i => `${statusEmoji(i.status)} *${i.label}* — ${statusLabel(i.status)}${i.note ? `\n    _${i.note}_` : ''}`)
+    .join('\n');
+
+  const message = [
+    `🔬 *АКТ ДІАГНОСТИКИ — ${card.companyName}*`,
+    ``,
+    `📋 Замовлення: *${card.orderId}*`,
+    `👤 Клієнт: ${card.clientName}`,
+    `🚗 Авто: ${card.carInfo}`,
+    `📅 Дата: ${card.date}`,
+    `👷 Майстер: ${card.masterName}`,
+    ``,
+    `*Результати діагностики:*`,
+    itemLines,
+    ``,
+    `📞 ${card.companyPhone}`,
+  ]
+    .filter(Boolean)
+    .join('\n');
+
+  try {
+    const response = await fetch(
+      `https://api.telegram.org/bot${settings.botToken}/sendMessage`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: targetChatId,
+          text: message,
+          parse_mode: 'Markdown',
+        }),
+      }
+    );
+    const result = await response.json();
+    return result.ok;
+  } catch (error) {
+    console.error('Telegram diagnostic card send error:', error);
+    return false;
+  }
+}
