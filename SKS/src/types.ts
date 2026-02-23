@@ -81,6 +81,14 @@ export type Employee = {
   role: 'Master' | 'Manager';
   dailyRate: number;
   bonusPercentage: number;
+  address?: string;
+  inn?: string;
+  idDocument?: {
+    series?: string;
+    number?: string;
+    issuedBy?: string;
+    issuedDate?: string;
+  };
 };
 
 export type Expense = {

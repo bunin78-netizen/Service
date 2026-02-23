@@ -147,9 +147,9 @@ const INITIAL_DATA: AppData = {
     }
   ],
   employees: [
-    { id: 'm1', name: 'Олександр Майстер', role: 'Master', dailyRate: 500, bonusPercentage: 30 },
-    { id: 'm2', name: 'Дмитро Механік', role: 'Master', dailyRate: 450, bonusPercentage: 25 },
-    { id: 'adm', name: 'Сергій Менеджер', role: 'Manager', dailyRate: 600, bonusPercentage: 5 },
+    { id: 'm1', name: 'Олександр Майстер', role: 'Master', dailyRate: 500, bonusPercentage: 30, address: 'м. Харків, вул. Науки, 5, кв. 12', inn: '1234567890', idDocument: { series: 'КН', number: '123456', issuedBy: 'Харківський РВ УМВС', issuedDate: '2015-06-10' } },
+    { id: 'm2', name: 'Дмитро Механік', role: 'Master', dailyRate: 450, bonusPercentage: 25, address: 'м. Харків, вул. Пушкінська, 20, кв. 3', inn: '0987654321', idDocument: { series: 'КН', number: '654321', issuedBy: 'Харківський РВ УМВС', issuedDate: '2017-03-22' } },
+    { id: 'adm', name: 'Сергій Менеджер', role: 'Manager', dailyRate: 600, bonusPercentage: 5, address: 'м. Харків, вул. Сумська, 100, кв. 55', inn: '1122334455', idDocument: { series: 'КА', number: '999888', issuedBy: 'Харківський РВ УМВС', issuedDate: '2018-11-05' } },
   ],
   expenses: [
     { id: 'e1', category: 'Оренда', amount: 15000, date: '2023-10-01', description: 'Оренда приміщення жовтень' },
