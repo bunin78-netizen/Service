@@ -210,6 +210,7 @@ const INITIAL_DATA: AppData = {
     notifyLowStock: true,
     notifyPaymentReceived: true,
     notifyNewClient: true,
+    notifyApproval: true,
     sendReceipts: false,
     sendFiscalReceipts: false,
     sendDocuments: false,
