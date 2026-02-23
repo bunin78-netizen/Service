@@ -176,6 +176,7 @@ export type WarehouseDocumentItem = {
   price: number;
   id?: string;
   name?: string;
+  category?: string;
 };
 
 export type WarehouseDocument = {

@@ -268,7 +268,7 @@ export default function DocumentImports({ data, updateData }: { data: AppData; u
                           <td className="p-2">{(line.vatRate * 100).toFixed(0)}%</td>
                           <td className="p-2">{line.confidence.toFixed(2)}</td>
                           <td className="p-2">
-                            <select className="border rounded p-1" value={data.inventory.find(p => p.id === line.matchedProductId)?.category || ''} onChange={(e) => onSetLineCategory(line.id, e.target.value)} disabled={!line.matchedProductId}>
+                            <select className="border rounded p-1" value={data.inventory.find(p => p.id === line.matchedProductId)?.category || ''} onChange={(e) => onSetLineCategory(line.id, e.target.value)} disabled={!line.matchedProductId} title={!line.matchedProductId ? 'Товар не зіставлено' : undefined}>
                               <option value="">— оберіть —</option>
                               {data.categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
                             </select>

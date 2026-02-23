@@ -126,6 +126,12 @@ export default function WarehouseDocuments({
       const err = checkStock(form.type, form.items, newInventory);
       if (err) { alert(err); return; }
       newInventory = applyDocumentToInventory(form.type, form.items, newInventory, 1);
+      if (form.type === 'incoming') {
+        newInventory = newInventory.map(p => {
+          const item = form.items.find(i => i.partId === p.id && i.category);
+          return item ? { ...p, category: item.category! } : p;
+        });
+      }
       const updated = docs.map(d =>
         d.id === editingDoc.id ? { ...d, ...form } : d
       );
@@ -133,7 +139,13 @@ export default function WarehouseDocuments({
     } else {
       const err = checkStock(form.type, form.items, data.inventory);
       if (err) { alert(err); return; }
-      const newInventory = applyDocumentToInventory(form.type, form.items, data.inventory, 1);
+      let newInventory = applyDocumentToInventory(form.type, form.items, data.inventory, 1);
+      if (form.type === 'incoming') {
+        newInventory = newInventory.map(p => {
+          const item = form.items.find(i => i.partId === p.id && i.category);
+          return item ? { ...p, category: item.category! } : p;
+        });
+      }
       const newDoc: WarehouseDocument = { id: generateId(), ...form };
       updateData({ warehouseDocuments: [newDoc, ...docs], inventory: newInventory });
     }
@@ -154,16 +166,27 @@ export default function WarehouseDocuments({
 
   const addItem = () => {
     if (data.inventory.length === 0) return;
+    const firstPart = data.inventory[0];
+    const newItem: WarehouseDocumentItem = { partId: firstPart.id, quantity: 1, price: 0 };
+    if (form.type === 'incoming') newItem.category = firstPart.category || '';
     setForm(prev => ({
       ...prev,
-      items: [...prev.items, { partId: data.inventory[0].id, quantity: 1, price: 0 }],
+      items: [...prev.items, newItem],
     }));
   };
 
   const updateItem = (idx: number, patch: Partial<WarehouseDocumentItem>) => {
     setForm(prev => ({
       ...prev,
-      items: prev.items.map((item, i) => (i === idx ? { ...item, ...patch } : item)),
+      items: prev.items.map((item, i) => {
+        if (i !== idx) return item;
+        const updated = { ...item, ...patch };
+        if (patch.partId !== undefined && prev.type === 'incoming') {
+          const part = data.inventory.find(p => p.id === patch.partId);
+          updated.category = part?.category || '';
+        }
+        return updated;
+      }),
     }));
   };
 
@@ -562,6 +585,21 @@ export default function WarehouseDocuments({
                             <X size={15} />
                           </button>
                         </div>
+                        {form.type === 'incoming' && (
+                          <div className="grid grid-cols-[auto_1fr] gap-2 items-center">
+                            <label className="text-xs text-neutral-500">Категорія:</label>
+                            <select
+                              value={item.category || ''}
+                              onChange={e => updateItem(idx, { category: e.target.value })}
+                              className="p-1.5 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-[#ffcc00]"
+                            >
+                              <option value="">— оберіть —</option>
+                              {data.categories.map(c => (
+                                <option key={c.id} value={c.name}>{c.name}</option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
                         {insufficient && (
                           <p className="text-xs text-red-500 pl-1">
                             На складі лише {part?.stock} шт.
