@@ -1,14 +1,18 @@
 import React, { useState } from 'react';
 import { AppData } from '../types';
-import { Save, Building, Phone, Mail, CreditCard, User } from 'lucide-react';
+import { Save, Building, Phone, Mail, CreditCard, User, Tag } from 'lucide-react';
 
 const Settings = ({ data, updateData }: { data: AppData, updateData: (d: Partial<AppData>) => void }) => {
   const [formData, setFormData] = useState(data.companySettings);
+  const [defaultMarkup, setDefaultMarkup] = useState(data.settings?.defaultMarkup ?? 0);
   const [isSaved, setIsSaved] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    updateData({ companySettings: formData });
+    updateData({
+      companySettings: formData,
+      settings: { ...data.settings, defaultMarkup },
+    });
     setIsSaved(true);
     setTimeout(() => setIsSaved(false), 3000);
   };
@@ -110,6 +114,45 @@ const Settings = ({ data, updateData }: { data: AppData, updateData: (d: Partial
               onChange={(e) => setFormData({ ...formData, managerName: e.target.value })}
               className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#ffcc00] outline-none"
             />
+          </div>
+        </div>
+
+        <div className="p-6 bg-gray-50 flex justify-end">
+          <button
+            type="submit"
+            className="bg-[#ffcc00] hover:bg-yellow-500 text-black px-6 py-2 rounded-lg font-bold flex items-center shadow-md transition-all"
+          >
+            <Save className="w-5 h-5 mr-2" />
+            Зберегти
+          </button>
+        </div>
+      </form>
+
+      {/* Pricing settings */}
+      <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden mt-6">
+        <div className="p-6 border-b border-gray-100 bg-gray-50">
+          <h2 className="text-lg font-semibold flex items-center text-gray-800">
+            <Tag className="w-5 h-5 mr-2 text-[#ffcc00]" />
+            Ціноутворення
+          </h2>
+        </div>
+
+        <div className="p-6">
+          <div className="max-w-xs">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Наценка за замовчуванням (%)
+            </label>
+            <input
+              type="number"
+              min="0"
+              step="0.1"
+              value={defaultMarkup}
+              onChange={(e) => setDefaultMarkup(Number(e.target.value))}
+              className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#ffcc00] outline-none"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Використовується для автоматичного розрахунку ціни продажу при створенні нового товару.
+            </p>
           </div>
         </div>
 

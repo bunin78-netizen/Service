@@ -22,6 +22,7 @@ export default function Inventory({ data, updateData }: { data: AppData, updateD
   const [newCategoryName, setNewCategoryName] = useState('');
   const [supplierForm, setSupplierForm] = useState({ name: '', phone: '', email: '' });
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
+  const [partMarkup, setPartMarkup] = useState(0);
   const [partForm, setPartForm] = useState<Partial<Part>>({
     sku: '',
     name: '',
@@ -83,14 +84,22 @@ export default function Inventory({ data, updateData }: { data: AppData, updateD
     if (part) {
       setEditingPart(part);
       setPartForm({ ...part });
+      const markup = part.purchasePrice > 0
+        ? Math.round(((part.salePrice - part.purchasePrice) / part.purchasePrice) * 1000) / 10
+        : 0;
+      setPartMarkup(markup);
     } else {
       setEditingPart(null);
+      const globalMarkup = data.settings?.defaultMarkup ?? 0;
+      const defaultPurchase = 0;
+      const defaultSale = defaultPurchase * (1 + globalMarkup / 100);
+      setPartMarkup(globalMarkup);
       setPartForm({
         sku: '',
         name: '',
         category: data.categories[0]?.name || '',
-        purchasePrice: 0,
-        salePrice: 0,
+        purchasePrice: defaultPurchase,
+        salePrice: defaultSale,
         stock: 0,
         minStock: 0,
         supplierId: data.suppliers[0]?.id || '',
@@ -98,6 +107,17 @@ export default function Inventory({ data, updateData }: { data: AppData, updateD
       });
     }
     setShowPartModal(true);
+  };
+
+  const handlePurchasePriceChange = (value: number) => {
+    const salePrice = Math.round(value * (1 + partMarkup / 100) * 100) / 100;
+    setPartForm({ ...partForm, purchasePrice: value, salePrice });
+  };
+
+  const handleMarkupChange = (markup: number) => {
+    setPartMarkup(markup);
+    const salePrice = Math.round((partForm.purchasePrice || 0) * (1 + markup / 100) * 100) / 100;
+    setPartForm({ ...partForm, salePrice });
   };
 
   const handleSavePart = () => {
@@ -557,11 +577,22 @@ export default function Inventory({ data, updateData }: { data: AppData, updateD
                   <input
                     type="number"
                     value={partForm.purchasePrice || ''}
-                    onChange={(e) => setPartForm({ ...partForm, purchasePrice: Number(e.target.value) })}
+                    onChange={(e) => handlePurchasePriceChange(Number(e.target.value))}
                     className="w-full p-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#ffcc00]"
                   />
                 </div>
                 <div>
+                  <label className="block text-sm font-medium text-neutral-700 mb-1">Наценка (%)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.1"
+                    value={partMarkup}
+                    onChange={(e) => handleMarkupChange(Number(e.target.value))}
+                    className="w-full p-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#ffcc00]"
+                  />
+                </div>
+                <div className="col-span-2">
                   <label className="block text-sm font-medium text-neutral-700 mb-1">Ціна продажу</label>
                   <input
                     type="number"

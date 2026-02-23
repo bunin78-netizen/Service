@@ -159,6 +159,7 @@ const INITIAL_DATA: AppData = {
   settings: {
     rroEnabled: false,
     rroApiKey: '',
+    defaultMarkup: 0,
   },
   warehouseDocuments: [
     {
@@ -240,6 +241,7 @@ export function loadData(): AppData {
     return {
       ...INITIAL_DATA,
       ...parsed,
+      settings: { ...INITIAL_DATA.settings, ...(parsed.settings || {}) },
       users: parsed.users || INITIAL_DATA.users,
       notifications: parsed.notifications || INITIAL_DATA.notifications,
       currentUserId: parsed.currentUserId || INITIAL_DATA.currentUserId,
