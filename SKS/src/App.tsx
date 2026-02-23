@@ -106,6 +106,8 @@ export function App() {
     setLoggedInUserId(userId);
     setIsLoggedIn(true);
     updateData({ currentUserId: userId });
+    const user = data.users.find(u => u.id === userId);
+    setActiveTab(user?.role === 'master' ? 'workorders' : 'dashboard');
   };
 
   const handleLogout = () => {
@@ -179,13 +181,14 @@ export function App() {
   };
 
   const isAdmin = currentUser?.role === 'admin';
+  const isMaster = currentUser?.role === 'master';
 
   // ── Navigation ──────────────────────────────────────────────────────────────
   const navGroups = [
     {
       label: 'Головне',
       items: [
-        { id: 'dashboard', label: 'Панель', icon: LayoutDashboard },
+        ...(!isMaster ? [{ id: 'dashboard', label: 'Панель', icon: LayoutDashboard }] : []),
         { id: 'workorders', label: 'Наряд-замовлення', icon: Wrench },
         { id: 'diagnosis', label: 'Діагностика', icon: Stethoscope },
         { id: 'clients', label: 'Клієнти', icon: Users },
@@ -203,17 +206,17 @@ export function App() {
     {
       label: 'Фінанси',
       items: [
-        { id: 'expenses', label: 'Витрати', icon: Wallet },
+        ...(!isMaster ? [{ id: 'expenses', label: 'Витрати', icon: Wallet }] : []),
         ...(isAdmin ? [{ id: 'salary', label: 'Зарплата', icon: Calculator }] : []),
         ...(isAdmin ? [{ id: 'reports', label: 'Звіти', icon: TrendingUp }] : []),
-        { id: 'rro', label: 'РРО / ПРРО', icon: Receipt },
+        ...(!isMaster ? [{ id: 'rro', label: 'РРО / ПРРО', icon: Receipt }] : []),
       ],
     },
     {
       label: 'Система',
       items: [
-        { id: 'telegram', label: 'Telegram Бот', icon: Bot },
-        { id: 'viber', label: 'Viber Бот', icon: MessageCircle },
+        ...(!isMaster ? [{ id: 'telegram', label: 'Telegram Бот', icon: Bot }] : []),
+        ...(!isMaster ? [{ id: 'viber', label: 'Viber Бот', icon: MessageCircle }] : []),
         ...(isAdmin ? [{ id: 'users', label: 'Користувачі', icon: UserCog }] : []),
         ...(isAdmin ? [{ id: 'settings', label: 'Налаштування', icon: Settings }] : []),
       ],
@@ -232,7 +235,7 @@ export function App() {
 
   const renderContent = () => {
     switch (activeTab) {
-      case 'dashboard': return <Dashboard data={data} setActiveTab={setActiveTab} />;
+      case 'dashboard': return isMaster ? accessDenied : <Dashboard data={data} setActiveTab={setActiveTab} />;
       case 'clients': return <Clients data={data} updateData={updateData} addNotification={addNotification} />;
       case 'inventory': return <Inventory data={data} updateData={updateData} />;
       case 'warehousedocs': return <WarehouseDocuments data={data} updateData={updateData} />;
@@ -241,10 +244,10 @@ export function App() {
       case 'suppliershop': return <SupplierShop data={data} updateData={updateData} />;
       case 'salary': return isAdmin ? <Salary data={data} /> : accessDenied;
       case 'reports': return isAdmin ? <Reports data={data} /> : accessDenied;
-      case 'expenses': return <Expenses data={data} updateData={updateData} />;
-      case 'rro': return <RROPage data={data} updateData={updateData} />;
-      case 'telegram': return <TelegramPage data={data} onSave={(d) => setData(d)} />;
-      case 'viber': return <ViberPage data={data} onSave={(d) => setData(d)} />;
+      case 'expenses': return isMaster ? accessDenied : <Expenses data={data} updateData={updateData} />;
+      case 'rro': return isMaster ? accessDenied : <RROPage data={data} updateData={updateData} />;
+      case 'telegram': return isMaster ? accessDenied : <TelegramPage data={data} onSave={(d) => setData(d)} />;
+      case 'viber': return isMaster ? accessDenied : <ViberPage data={data} onSave={(d) => setData(d)} />;
       case 'users': return isAdmin ? <UsersPage data={data} updateData={updateData} /> : accessDenied;
       case 'settings': return isAdmin ? <SettingsPage data={data} updateData={updateData} /> : accessDenied;
       case 'database': return <DatabasePage data={data} updateData={updateData} />;
