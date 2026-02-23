@@ -1,0 +1,37 @@
+{
+  "supplier": {
+    "name": "Омега-Автопоставка",
+    "supplierId": "s1"
+  },
+  "docNumber": "0318580",
+  "docDate": "2026-02-19",
+  "totals": {
+    "net": 2850.0,
+    "vat": 570.0,
+    "gross": 3420.0
+  },
+  "lines": [
+    {
+      "name": "Мастило 5W30 4л",
+      "supplierSku": "OIL-5W30-4L",
+      "barcode": "482000000001",
+      "qty": 2,
+      "unit": "шт",
+      "priceNet": 1000,
+      "vatRate": 0.2,
+      "lineTotal": 2400,
+      "confidence": 0.98
+    },
+    {
+      "name": "Антифриз G12 5л",
+      "supplierSku": "COOL-5L",
+      "barcode": "482000000004",
+      "qty": 1,
+      "unit": "шт",
+      "priceNet": 850,
+      "vatRate": 0.2,
+      "lineTotal": 1020,
+      "confidence": 0.89
+    }
+  ]
+}
