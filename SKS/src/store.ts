@@ -2,9 +2,9 @@ import { AppData } from './types';
 
 const INITIAL_DATA: AppData = {
   clients: [
-    { id: '1', name: 'Іван Петренко', phone: '+380671234567', car: { make: 'Toyota', model: 'Camry', year: 2018, vin: 'JT1234567890', plate: 'AX1234AB' }, createdAt: '2023-10-01' },
-    { id: '2', name: 'Олена Сидоренко', phone: '+380509876543', car: { make: 'BMW', model: 'X5', year: 2020, vin: 'WB1234567890', plate: 'AX0001CB' }, createdAt: '2023-10-05' },
-    { id: '3', name: 'Микола Шевченко', phone: '+380931112233', car: { make: 'Volkswagen', model: 'Passat', year: 2019, vin: 'VW9876543210', plate: 'AX5555AA' }, createdAt: '2023-10-10' },
+    { id: '1', name: 'Іван Петренко', phone: '+380671234567', discountPercent: 5, phoneVerified: true, telegramChatId: '123456789', car: { make: 'Toyota', model: 'Camry', year: 2018, vin: 'JT1234567890', plate: 'AX1234AB' }, createdAt: '2023-10-01' },
+    { id: '2', name: 'Олена Сидоренко', phone: '+380509876543', discountPercent: 0, phoneVerified: false, telegramChatId: '', car: { make: 'BMW', model: 'X5', year: 2020, vin: 'WB1234567890', plate: 'AX0001CB' }, createdAt: '2023-10-05' },
+    { id: '3', name: 'Микола Шевченко', phone: '+380931112233', discountPercent: 10, phoneVerified: true, telegramChatId: '987654321', car: { make: 'Volkswagen', model: 'Passat', year: 2019, vin: 'VW9876543210', plate: 'AX5555AA' }, createdAt: '2023-10-10' },
   ],
   inventory: [
     { id: '1', sku: 'OIL-5W30-4L', name: 'Мастило 5W30 4л', category: 'Мастила', purchasePrice: 1200, salePrice: 1800, stock: 15, minStock: 5, supplierId: 's1', lastPurchaseDate: '2023-10-01' },
