@@ -59,6 +59,7 @@ export type WorkOrder = {
   paymentType: 'Cash' | 'Card' | 'Bank';
   isPaid: boolean;
   total: number;
+  approvalStatus?: 'pending' | 'approved' | 'rejected';
 };
 
 export type DiagnosticCard = {
@@ -141,6 +142,7 @@ export type TelegramSettings = {
   notifyLowStock: boolean;
   notifyPaymentReceived: boolean;
   notifyNewClient: boolean;
+  notifyApproval: boolean;
   sendReceipts: boolean;
   sendFiscalReceipts: boolean;
   sendDocuments: boolean;

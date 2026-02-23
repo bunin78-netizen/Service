@@ -9,7 +9,7 @@ import {
 import { format } from 'date-fns';
 import { generateId, generateOrderId } from '../store';
 import { loadDbExtras } from './Database';
-import { sendTelegramReceipt, sendTelegramWorkOrderDocument } from './Telegram';
+import { sendTelegramReceipt, sendTelegramWorkOrderDocument, sendTelegramApprovalRequest } from './Telegram';
 
 interface WorkOrdersProps {
   data: AppData;
@@ -131,6 +131,7 @@ export default function WorkOrders({ data, updateData, addNotification, openDiag
   const [quickClientForm, setQuickClientForm] = useState<Omit<Client, 'id' | 'createdAt'>>(emptyQuickClientForm());
   const [receiptSendStatus, setReceiptSendStatus] = useState<Record<string, 'idle' | 'loading' | 'success' | 'error'>>({});
   const [docSendStatus, setDocSendStatus] = useState<Record<string, 'idle' | 'loading' | 'success' | 'error'>>({});
+  const [approvalSendStatus, setApprovalSendStatus] = useState<Record<string, 'idle' | 'loading' | 'success' | 'error'>>({});
 
   // ── Filtered orders ──────────────────────────────────────────────────────
   const filteredOrders = useMemo(() => {
@@ -314,6 +315,55 @@ export default function WorkOrders({ data, updateData, addNotification, openDiag
     });
     setDocSendStatus(s => ({ ...s, [order.id]: ok ? 'success' : 'error' }));
     setTimeout(() => setDocSendStatus(s => ({ ...s, [order.id]: 'idle' })), 4000);
+  };
+
+  // ── Send Approval Request via Telegram ────────────────────────────────────
+  const handleSendApprovalRequest = async (order: WorkOrder) => {
+    const tg = data.telegramSettings;
+    if (!tg?.enabled) return;
+    setApprovalSendStatus(s => ({ ...s, [order.id]: 'loading' }));
+    const client = data.clients.find(c => c.id === order.clientId);
+    const master = data.employees.find(e => e.id === order.masterId);
+    const cs = data.companySettings;
+    const ok = await sendTelegramApprovalRequest(tg, {
+      orderId: order.id,
+      clientName: client?.name || '-',
+      carInfo: client?.car ? `${client.car.make} ${client.car.model} (${client.car.year}) ${client.car.plate}` : '-',
+      date: format(new Date(order.date), 'dd.MM.yyyy'),
+      masterName: master?.name || '-',
+      services: order.services.map(s => ({ name: s.name, price: s.price, hours: s.hours })),
+      parts: order.parts.map(p => {
+        const part = data.inventory.find(inv => inv.id === p.partId);
+        return { name: part?.name || 'Запчастина', quantity: p.quantity, price: p.price };
+      }),
+      total: order.total,
+      companyName: cs.name,
+      companyPhone: cs.phone,
+    });
+    if (ok) {
+      const updated = data.workOrders.map(o =>
+        o.id === order.id ? { ...o, approvalStatus: 'pending' as const } : o
+      );
+      updateData({ workOrders: updated });
+      addLog({ action: 'status_changed', orderId: order.id, userName: currentUserName, details: 'Надіслано запит на узгодження у Telegram' });
+    }
+    setApprovalSendStatus(s => ({ ...s, [order.id]: ok ? 'success' : 'error' }));
+    setTimeout(() => setApprovalSendStatus(s => ({ ...s, [order.id]: 'idle' })), 4000);
+  };
+
+  // ── Record Approval Result ────────────────────────────────────────────────
+  const handleSetApprovalResult = (orderId: string, result: 'approved' | 'rejected') => {
+    const updated = data.workOrders.map(o =>
+      o.id === orderId ? { ...o, approvalStatus: result } : o
+    );
+    updateData({ workOrders: updated });
+    const label = result === 'approved' ? 'Узгоджено клієнтом' : 'Відхилено клієнтом';
+    addLog({ action: 'status_changed', orderId, userName: currentUserName, details: label });
+    if (result === 'approved') {
+      addNotification({ type: 'order', title: 'Замовлення узгоджено', message: `Наряд ${orderId} узгоджено клієнтом` });
+    } else {
+      addNotification({ type: 'order', title: 'Замовлення відхилено', message: `Наряд ${orderId} відхилено клієнтом` });
+    }
   };
 
   // ── Restore Cancelled ─────────────────────────────────────────────────────
@@ -915,6 +965,17 @@ export default function WorkOrders({ data, updateData, addNotification, openDiag
                   <span className={`hidden sm:inline text-[11px] px-3 py-1 rounded-full font-bold uppercase tracking-wider ${STATUS_COLORS[order.status]}`}>
                     {STATUS_LABELS[order.status]}
                   </span>
+                  {order.approvalStatus && (
+                    <span className={`hidden sm:inline text-[11px] px-2 py-1 rounded-full font-bold uppercase tracking-wider ${
+                      order.approvalStatus === 'approved' ? 'bg-indigo-100 text-indigo-700' :
+                      order.approvalStatus === 'rejected' ? 'bg-red-100 text-red-700' :
+                      'bg-yellow-100 text-yellow-700'
+                    }`}>
+                      {order.approvalStatus === 'approved' ? '✓ Узгоджено' :
+                       order.approvalStatus === 'rejected' ? '✗ Відхилено' :
+                       '⏳ На узгодженні'}
+                    </span>
+                  )}
                   <span className={`sm:hidden w-2.5 h-2.5 rounded-full shrink-0 ${order.status === 'Completed' ? 'bg-green-500' : order.status === 'InProgress' ? 'bg-blue-500' : order.status === 'PendingParts' ? 'bg-yellow-500' : order.status === 'Cancelled' ? 'bg-red-400' : 'bg-neutral-400'}`} aria-label={STATUS_LABELS[order.status]} />
                   <div className="text-right">
                     <p className="font-bold text-base sm:text-lg whitespace-nowrap">{order.total.toLocaleString()} ₴</p>
@@ -1054,6 +1115,94 @@ export default function WorkOrders({ data, updateData, addNotification, openDiag
                         <Printer size={15} /> Акт виконаних робіт
                       </button>
                     </div>
+
+                    {/* Telegram Approval */}
+                    {data.telegramSettings?.enabled && order.status !== 'Cancelled' && (
+                      <div className="pt-3 border-t space-y-2">
+                        <p className="text-xs font-bold text-neutral-500 uppercase tracking-wide flex items-center gap-1">
+                          <Send size={11} /> Узгодження через Telegram
+                        </p>
+                        {!order.approvalStatus && (
+                          <button
+                            onClick={() => handleSendApprovalRequest(order)}
+                            disabled={approvalSendStatus[order.id] === 'loading'}
+                            className={`w-full flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-bold transition-colors ${
+                              approvalSendStatus[order.id] === 'success'
+                                ? 'bg-green-100 text-green-700'
+                                : approvalSendStatus[order.id] === 'error'
+                                ? 'bg-red-100 text-red-700'
+                                : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100'
+                            } disabled:opacity-50`}
+                          >
+                            {approvalSendStatus[order.id] === 'loading' ? (
+                              <><Loader size={14} className="animate-spin" /> Відправка...</>
+                            ) : approvalSendStatus[order.id] === 'success' ? (
+                              <><CheckCircle size={14} /> Запит надіслано!</>
+                            ) : approvalSendStatus[order.id] === 'error' ? (
+                              <><AlertTriangle size={14} /> Помилка відправки</>
+                            ) : (
+                              <><Send size={14} /> Надіслати на узгодження</> 
+                            )}
+                          </button>
+                        )}
+                        {order.approvalStatus === 'pending' && (
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2 p-2 bg-yellow-50 rounded-lg text-xs text-yellow-700 font-medium">
+                              <Loader size={13} className="animate-spin shrink-0" /> Очікується відповідь клієнта...
+                            </div>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => handleSetApprovalResult(order.id, 'approved')}
+                                className="flex-1 py-2 rounded-lg text-xs font-bold bg-indigo-100 text-indigo-700 hover:bg-indigo-200 flex items-center justify-center gap-1"
+                              >
+                                <CheckCircle size={13} /> Підтверджено
+                              </button>
+                              <button
+                                onClick={() => handleSetApprovalResult(order.id, 'rejected')}
+                                className="flex-1 py-2 rounded-lg text-xs font-bold bg-red-100 text-red-700 hover:bg-red-200 flex items-center justify-center gap-1"
+                              >
+                                <XCircle size={13} /> Відхилено
+                              </button>
+                            </div>
+                            <button
+                              onClick={() => handleSendApprovalRequest(order)}
+                              disabled={approvalSendStatus[order.id] === 'loading'}
+                              className="w-full py-1.5 rounded-lg text-xs font-bold bg-neutral-100 text-neutral-600 hover:bg-neutral-200 flex items-center justify-center gap-1 disabled:opacity-50"
+                            >
+                              <Send size={11} /> Повторно надіслати
+                            </button>
+                          </div>
+                        )}
+                        {order.approvalStatus === 'approved' && (
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2 p-2 bg-indigo-50 rounded-lg text-xs text-indigo-700 font-bold">
+                              <CheckCircle size={13} className="shrink-0" /> Замовлення узгоджено клієнтом
+                            </div>
+                            <button
+                              onClick={() => handleSendApprovalRequest(order)}
+                              disabled={approvalSendStatus[order.id] === 'loading'}
+                              className="w-full py-1.5 rounded-lg text-xs font-bold bg-neutral-100 text-neutral-600 hover:bg-neutral-200 flex items-center justify-center gap-1 disabled:opacity-50"
+                            >
+                              <Send size={11} /> Надіслати повторно
+                            </button>
+                          </div>
+                        )}
+                        {order.approvalStatus === 'rejected' && (
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2 p-2 bg-red-50 rounded-lg text-xs text-red-700 font-bold">
+                              <XCircle size={13} className="shrink-0" /> Замовлення відхилено клієнтом
+                            </div>
+                            <button
+                              onClick={() => handleSendApprovalRequest(order)}
+                              disabled={approvalSendStatus[order.id] === 'loading'}
+                              className="w-full py-1.5 rounded-lg text-xs font-bold bg-neutral-100 text-neutral-600 hover:bg-neutral-200 flex items-center justify-center gap-1 disabled:opacity-50"
+                            >
+                              <Send size={11} /> Надіслати оновлений запит
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   {/* Right: diagnosis + payment */}

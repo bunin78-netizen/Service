@@ -17,6 +17,7 @@ export default function Telegram({ data, onSave }: Props) {
     notifyLowStock: true,
     notifyPaymentReceived: true,
     notifyNewClient: true,
+    notifyApproval: true,
     sendReceipts: false,
     sendFiscalReceipts: false,
     sendDocuments: false,
@@ -310,6 +311,22 @@ export default function Telegram({ data, onSave }: Props) {
 
             <label className="flex items-center justify-between p-4 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100">
               <div className="flex items-center gap-3">
+                <CheckCircle className="w-5 h-5 text-indigo-500" />
+                <div>
+                  <span className="font-medium">Узгодження наряд-замовлення</span>
+                  <p className="text-xs text-gray-500">Надсилати деталі замовлення клієнту для узгодження</p>
+                </div>
+              </div>
+              <input
+                type="checkbox"
+                checked={settings.notifyApproval ?? true}
+                onChange={(e) => updateSettings({ ...settings, notifyApproval: e.target.checked })}
+                className="w-5 h-5 text-yellow-500 rounded focus:ring-yellow-500"
+              />
+            </label>
+
+            <label className="flex items-center justify-between p-4 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100">
+              <div className="flex items-center gap-3">
                 <FileText className="w-5 h-5 text-yellow-500" />
                 <div>
                   <span className="font-medium">Відправка чеків клієнтам</span>
@@ -399,6 +416,14 @@ export default function Telegram({ data, onSave }: Props) {
             <div className="p-3 bg-gray-50 rounded-lg">
               <code className="text-blue-600 font-mono">/document [номер замовлення]</code>
               <p className="text-sm text-gray-600 mt-1">Отримати акт виконаних робіт</p>
+            </div>
+            <div className="p-3 bg-indigo-50 rounded-lg border border-indigo-100">
+              <code className="text-indigo-600 font-mono">/approve [номер замовлення]</code>
+              <p className="text-sm text-gray-600 mt-1">Підтвердити узгодження наряд-замовлення</p>
+            </div>
+            <div className="p-3 bg-red-50 rounded-lg border border-red-100">
+              <code className="text-red-500 font-mono">/reject [номер замовлення]</code>
+              <p className="text-sm text-gray-600 mt-1">Відхилити наряд-замовлення</p>
             </div>
           </div>
         </div>
@@ -785,6 +810,85 @@ export async function sendTelegramWorkOrderDocument(
     return result.ok;
   } catch (error) {
     console.error('Telegram work order document send error:', error);
+    return false;
+  }
+}
+
+// Export function to send work order for client approval via Telegram
+export async function sendTelegramApprovalRequest(
+  settings: TelegramSettings,
+  order: {
+    orderId: string;
+    clientName: string;
+    carInfo: string;
+    date: string;
+    masterName: string;
+    services: { name: string; price: number; hours: number }[];
+    parts: { name: string; quantity: number; price: number }[];
+    total: number;
+    companyName: string;
+    companyPhone: string;
+  },
+  chatId?: string
+): Promise<boolean> {
+  if (!settings.enabled || !settings.botToken) return false;
+  if (!(settings.notifyApproval ?? true)) return false;
+
+  const targetChatId = chatId || settings.chatId;
+  if (!targetChatId) return false;
+
+  const serviceLines = order.services
+    .map(s => `  • ${s.name}${s.hours ? ` (${s.hours} год)` : ''} — ${s.price.toLocaleString()} ₴`)
+    .join('\n');
+  const partLines = order.parts
+    .map(p => `  • ${p.name} ×${p.quantity} — ${(p.price * p.quantity).toLocaleString()} ₴`)
+    .join('\n');
+
+  const itemsSection = [
+    serviceLines && `*Роботи:*\n${serviceLines}`,
+    partLines && `*Запчастини:*\n${partLines}`,
+  ]
+    .filter(Boolean)
+    .join('\n');
+
+  const message = [
+    `📋 *Узгодження наряд-замовлення — ${order.companyName}*`,
+    ``,
+    `Замовлення: *${order.orderId}*`,
+    `👤 Клієнт: ${order.clientName}`,
+    `🚗 Авто: ${order.carInfo}`,
+    `📅 Дата: ${order.date}`,
+    `👷 Майстер: ${order.masterName}`,
+    ``,
+    itemsSection,
+    ``,
+    `💰 *Загальна сума: ${order.total.toLocaleString()} ₴*`,
+    ``,
+    `Для підтвердження надішліть: /approve ${order.orderId}`,
+    `Для відмови надішліть: /reject ${order.orderId}`,
+    ``,
+    `📞 ${order.companyPhone}`,
+  ]
+    .filter(Boolean)
+    .join('\n');
+
+  try {
+    const response = await fetch(
+      `https://api.telegram.org/bot${settings.botToken}/sendMessage`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: targetChatId,
+          text: message,
+          parse_mode: 'Markdown',
+        }),
+      }
+    );
+    const result = await response.json();
+    return result.ok;
+  } catch (error) {
+    console.error('Telegram approval request send error:', error);
     return false;
   }
 }
