@@ -120,6 +120,10 @@ export default function WarehouseDocuments({
 
   const handleSave = () => {
     if (!form.number.trim() || !form.date) return;
+    if (form.items.length === 0) {
+      alert('Неможливо зберегти порожній документ: додайте хоча б один товар.');
+      return;
+    }
     if (editingDoc) {
       // Reverse old document effect, then validate and apply new document effect
       let newInventory = applyDocumentToInventory(editingDoc.type, editingDoc.items, data.inventory, -1);
@@ -156,12 +160,16 @@ export default function WarehouseDocuments({
     if (!confirm('Видалити документ?')) return;
     const doc = docs.find(d => d.id === id);
     const newDocs = docs.filter(d => d.id !== id);
+    const relatedDraft = data.receiptDrafts?.find(d => d.postedDocumentId === id);
+    const patch: Partial<AppData> = { warehouseDocuments: newDocs };
     if (doc) {
-      const newInventory = applyDocumentToInventory(doc.type, doc.items, data.inventory, -1);
-      updateData({ warehouseDocuments: newDocs, inventory: newInventory });
-    } else {
-      updateData({ warehouseDocuments: newDocs });
+      patch.inventory = applyDocumentToInventory(doc.type, doc.items, data.inventory, -1);
     }
+    if (relatedDraft) {
+      patch.receiptDrafts = (data.receiptDrafts || []).filter(d => d.id !== relatedDraft.id);
+      patch.importJobs = (data.importJobs || []).filter(j => j.id !== relatedDraft.importJobId);
+    }
+    updateData(patch);
   };
 
   const addItem = () => {

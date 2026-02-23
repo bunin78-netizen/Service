@@ -481,6 +481,10 @@ export function createReceiptDraft(data: AppData, jobId: string): AppData {
   const job = data.importJobs.find(j => j.id === jobId);
   if (!job || job.status !== 'DONE') throw new Error('Import is not completed');
 
+  if (job.lines.length === 0) {
+    throw new Error('Неможливо створити черновик: документ імпорту не містить рядків.');
+  }
+
   const now = new Date().toISOString();
   const lines = job.lines.map(line => ({
     id: generateId(),
@@ -517,6 +521,10 @@ export function postReceiptDraft(data: AppData, draftId: string): AppData {
   const draft = data.receiptDrafts.find(d => d.id === draftId);
   if (!draft) throw new Error('Draft not found');
   if (draft.status === 'POSTED') return data;
+
+  if (draft.lines.length === 0) {
+    throw new Error('Неможливо провести порожній документ: немає рядків.');
+  }
 
   if (draft.lines.some(l => !l.productId)) {
     throw new Error('Неможливо провести документ: не всі рядки зіставлені з товарами.');
