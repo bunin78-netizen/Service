@@ -97,6 +97,7 @@ export type Expense = {
   amount: number;
   date: string;
   description: string;
+  cashOrderNumber?: string;
 };
 
 export type CompanySettings = {
