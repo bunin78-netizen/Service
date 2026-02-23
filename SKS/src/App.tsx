@@ -55,6 +55,7 @@ export function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(() => window.innerWidth >= MOBILE_BREAKPOINT);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [warehouseNewDoc, setWarehouseNewDoc] = useState(false);
 
   // ── Auth state ──────────────────────────────────────────────────────────────
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => {
@@ -240,8 +241,8 @@ export function App() {
     switch (activeTab) {
       case 'dashboard': return isMaster ? accessDenied : <Dashboard data={data} setActiveTab={setActiveTab} />;
       case 'clients': return <Clients data={data} updateData={updateData} addNotification={addNotification} />;
-      case 'inventory': return <Inventory data={data} updateData={updateData} />;
-      case 'warehousedocs': return <WarehouseDocuments data={data} updateData={updateData} />;
+      case 'inventory': return <Inventory data={data} updateData={updateData} onAddProduct={() => { setActiveTab('warehousedocs'); setWarehouseNewDoc(true); }} />;
+      case 'warehousedocs': return <WarehouseDocuments data={data} updateData={updateData} autoOpenNew={warehouseNewDoc} onAutoOpenHandled={() => setWarehouseNewDoc(false)} />;
       case 'docimports': return <DocumentImports data={data} updateData={updateData} />;
       case 'workorders': return <WorkOrders data={data} updateData={updateData} addNotification={addNotification} />;
       case 'diagnosis': return <DiagnosisPage data={data} updateData={updateData} />;
