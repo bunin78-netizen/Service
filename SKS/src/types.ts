@@ -141,6 +141,7 @@ export type TelegramSettings = {
   notifyLowStock: boolean;
   notifyPaymentReceived: boolean;
   notifyNewClient: boolean;
+  sendReceipts: boolean;
   welcomeMessage: string;
 };
 

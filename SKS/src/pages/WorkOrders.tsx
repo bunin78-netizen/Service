@@ -4,11 +4,12 @@ import {
   Plus, Search, FileText, Printer, Stethoscope, CheckCircle,
   AlertTriangle, XCircle, ChevronDown, ChevronUp, X, Save,
   Trash2, CreditCard, Banknote, Building, Edit2, RotateCcw,
-  ClipboardList, Clock, History, Filter, Eye, Car, User
+  ClipboardList, Clock, History, Filter, Eye, Car, User, Send, Loader
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { generateId, generateOrderId } from '../store';
 import { loadDbExtras } from './Database';
+import { sendTelegramReceipt } from './Telegram';
 
 interface WorkOrdersProps {
   data: AppData;
@@ -128,6 +129,7 @@ export default function WorkOrders({ data, updateData, addNotification, openDiag
   const [showNormsDropdown, setShowNormsDropdown] = useState<number | null>(null);
   const [showAddClientModal, setShowAddClientModal] = useState(false);
   const [quickClientForm, setQuickClientForm] = useState<Omit<Client, 'id' | 'createdAt'>>(emptyQuickClientForm());
+  const [receiptSendStatus, setReceiptSendStatus] = useState<Record<string, 'idle' | 'loading' | 'success' | 'error'>>({});
 
   // ── Filtered orders ──────────────────────────────────────────────────────
   const filteredOrders = useMemo(() => {
@@ -258,6 +260,31 @@ export default function WorkOrders({ data, updateData, addNotification, openDiag
     updateData({ workOrders: updated });
     addLog({ action: 'payment_cancelled', orderId, userName: currentUserName, details: `Оплату скасовано` });
     addNotification({ type: 'order', title: 'Оплату скасовано', message: `Оплата замовлення ${orderId} скасована` });
+  };
+
+  // ── Send Telegram Receipt ─────────────────────────────────────────────────
+  const handleSendTelegramReceipt = async (order: WorkOrder) => {
+    const tg = data.telegramSettings;
+    if (!tg?.enabled || !tg.sendReceipts) return;
+    setReceiptSendStatus(s => ({ ...s, [order.id]: 'loading' }));
+    const client = data.clients.find(c => c.id === order.clientId);
+    const cs = data.companySettings;
+    const ok = await sendTelegramReceipt(tg, {
+      orderId: order.id,
+      clientName: client?.name || '-',
+      carInfo: client?.car ? `${client.car.make} ${client.car.model} (${client.car.year}) ${client.car.plate}` : '-',
+      services: order.services.map(s => ({ name: s.name, price: s.price })),
+      parts: order.parts.map(p => {
+        const part = data.inventory.find(inv => inv.id === p.partId);
+        return { name: part?.name || 'Запчастина', quantity: p.quantity, price: p.price };
+      }),
+      total: order.total,
+      paymentType: order.paymentType,
+      date: format(new Date(order.date), 'dd.MM.yyyy'),
+      companyName: cs.name,
+    });
+    setReceiptSendStatus(s => ({ ...s, [order.id]: ok ? 'success' : 'error' }));
+    setTimeout(() => setReceiptSendStatus(s => ({ ...s, [order.id]: 'idle' })), 4000);
   };
 
   // ── Restore Cancelled ─────────────────────────────────────────────────────
@@ -1078,6 +1105,29 @@ export default function WorkOrders({ data, updateData, addNotification, openDiag
                             </p>
                           </div>
                         </div>
+                        {data.telegramSettings?.enabled && data.telegramSettings?.sendReceipts && (
+                          <button
+                            onClick={() => handleSendTelegramReceipt(order)}
+                            disabled={receiptSendStatus[order.id] === 'loading'}
+                            className={`mt-2 w-full flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-bold transition-colors ${
+                              receiptSendStatus[order.id] === 'success'
+                                ? 'bg-green-100 text-green-700'
+                                : receiptSendStatus[order.id] === 'error'
+                                ? 'bg-red-100 text-red-700'
+                                : 'bg-blue-50 text-blue-700 hover:bg-blue-100'
+                            } disabled:opacity-50`}
+                          >
+                            {receiptSendStatus[order.id] === 'loading' ? (
+                              <><Loader size={14} className="animate-spin" /> Відправка...</>
+                            ) : receiptSendStatus[order.id] === 'success' ? (
+                              <><CheckCircle size={14} /> Чек відправлено!</>
+                            ) : receiptSendStatus[order.id] === 'error' ? (
+                              <><AlertTriangle size={14} /> Помилка відправки</>
+                            ) : (
+                              <><Send size={14} /> Надіслати чек в Telegram</>
+                            )}
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>
